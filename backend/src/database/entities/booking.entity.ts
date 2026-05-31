@@ -49,7 +49,7 @@ export class Booking {
   @JoinColumn({ name: 'confirmed_by' })
   confirmedByUser: User;
 
-  @Column({ name: 'cancel_reason', nullable: true })
+  @Column({ name: 'cancel_reason', type: 'text', nullable: true })
   cancelReason: string | null;
 
   @Column({ name: 'expires_at', type: 'timestamptz', nullable: true })

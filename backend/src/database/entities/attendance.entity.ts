@@ -31,7 +31,7 @@ export class Attendance {
   @Column({ default: false })
   present: boolean;
 
-  @Column({ type: 'text', nullable: true })
+  @Column({ type: 'text', nullable: true, default: null })
   note: string | null;
 
   @CreateDateColumn({ name: 'marked_at' })

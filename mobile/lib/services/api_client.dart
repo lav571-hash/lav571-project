@@ -2,7 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class ApiClient {
-  static const String _baseUrl = 'http://localhost:3000/api/v1';
+  static const String _baseUrl = 'https://happens-spider-matthew-therapeutic.trycloudflare.com/api/v1';
 
   late final Dio _dio;
   final _storage = const FlutterSecureStorage();

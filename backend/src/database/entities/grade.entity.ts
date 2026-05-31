@@ -25,7 +25,7 @@ export class Grade {
   @Column({ type: 'smallint' })
   score: number;
 
-  @Column({ type: 'text', nullable: true })
+  @Column({ type: 'text', nullable: true, default: null })
   comment: string | null;
 
   @Column({ name: 'graded_by' })
