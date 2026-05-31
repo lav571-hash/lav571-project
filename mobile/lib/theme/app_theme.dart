@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
   static const Color _black = Color(0xFF0D0D0D);
@@ -12,9 +13,14 @@ class AppTheme {
   static const Color _warning = Color(0xFFE5A84C);
 
   static ThemeData get dark {
+    final montserrat = GoogleFonts.montserratTextTheme();
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
+      textTheme: montserrat.apply(
+        bodyColor: _white,
+        displayColor: _white,
+      ),
       colorScheme: const ColorScheme.dark(
         primary: _gold,
         onPrimary: _black,
@@ -27,14 +33,12 @@ class AppTheme {
         onError: _white,
       ),
       scaffoldBackgroundColor: _black,
-      fontFamily: 'Montserrat',
-      appBarTheme: const AppBarTheme(
+      appBarTheme: AppBarTheme(
         backgroundColor: _black,
         foregroundColor: _white,
         elevation: 0,
         centerTitle: true,
-        titleTextStyle: TextStyle(
-          fontFamily: 'Montserrat',
+        titleTextStyle: GoogleFonts.montserrat(
           fontSize: 18,
           fontWeight: FontWeight.w600,
           color: _white,
@@ -55,8 +59,7 @@ class AppTheme {
           foregroundColor: _black,
           minimumSize: const Size(double.infinity, 52),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          textStyle: const TextStyle(
-            fontFamily: 'Montserrat',
+          textStyle: GoogleFonts.montserrat(
             fontWeight: FontWeight.w600,
             fontSize: 15,
             letterSpacing: 0.5,
@@ -69,8 +72,7 @@ class AppTheme {
           side: const BorderSide(color: _gold),
           minimumSize: const Size(double.infinity, 52),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          textStyle: const TextStyle(
-            fontFamily: 'Montserrat',
+          textStyle: GoogleFonts.montserrat(
             fontWeight: FontWeight.w600,
             fontSize: 15,
           ),
@@ -79,8 +81,7 @@ class AppTheme {
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: _gold,
-          textStyle: const TextStyle(
-            fontFamily: 'Montserrat',
+          textStyle: GoogleFonts.montserrat(
             fontWeight: FontWeight.w500,
             fontSize: 14,
           ),
@@ -138,39 +139,34 @@ class AppTheme {
 }
 
 extension AppTextStyles on TextTheme {
-  TextStyle get displayTitle => const TextStyle(
-        fontFamily: 'Montserrat',
+  TextStyle get displayTitle => GoogleFonts.montserrat(
         fontSize: 28,
         fontWeight: FontWeight.w700,
-        color: Color(0xFFFAFAFA),
+        color: const Color(0xFFFAFAFA),
         height: 1.2,
       );
 
-  TextStyle get sectionTitle => const TextStyle(
-        fontFamily: 'Montserrat',
+  TextStyle get sectionTitle => GoogleFonts.montserrat(
         fontSize: 20,
         fontWeight: FontWeight.w600,
-        color: Color(0xFFFAFAFA),
+        color: const Color(0xFFFAFAFA),
       );
 
-  TextStyle get cardTitle => const TextStyle(
-        fontFamily: 'Montserrat',
+  TextStyle get cardTitle => GoogleFonts.montserrat(
         fontSize: 16,
         fontWeight: FontWeight.w600,
-        color: Color(0xFFFAFAFA),
+        color: const Color(0xFFFAFAFA),
       );
 
-  TextStyle get bodyRegular => const TextStyle(
-        fontFamily: 'Montserrat',
+  TextStyle get bodyRegular => GoogleFonts.montserrat(
         fontSize: 14,
         fontWeight: FontWeight.w400,
-        color: Color(0xFFCCCCCC),
+        color: const Color(0xFFCCCCCC),
       );
 
-  TextStyle get caption => const TextStyle(
-        fontFamily: 'Montserrat',
+  TextStyle get caption => GoogleFonts.montserrat(
         fontSize: 12,
         fontWeight: FontWeight.w400,
-        color: Color(0xFF888888),
+        color: const Color(0xFF888888),
       );
 }

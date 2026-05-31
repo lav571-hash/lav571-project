@@ -193,9 +193,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           child: const Icon(Icons.content_cut, color: Colors.black, size: 24),
         ),
         const SizedBox(width: 12),
-        Column(
+        const Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: const [
+          children: [
             Text(
               'BARBER',
               style: TextStyle(
