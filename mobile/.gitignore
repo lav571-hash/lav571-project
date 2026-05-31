@@ -1,0 +1,11 @@
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+*.g.dart
+!lib/models/*.g.dart
+pubspec.lock
+.DS_Store
+ios/Pods/
+android/.gradle/
