@@ -1,0 +1,41 @@
+services:
+  - type: web
+    name: barber-academy-backend
+    runtime: node
+    region: frankfurt
+    plan: free
+    rootDir: backend
+    buildCommand: npm install && npm run build
+    startCommand: node dist/main
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ADMIN_EMAIL
+        value: admin@barber.academy
+      - key: ADMIN_PASSWORD
+        value: Admin1234!
+      - key: DATABASE_URL
+        fromDatabase:
+          name: barber-academy-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: barber-academy-redis
+          type: redis
+          property: connectionString
+
+  - type: redis
+    name: barber-academy-redis
+    plan: free
+    region: frankfurt
+    ipAllowList: []
+
+databases:
+  - name: barber-academy-db
+    databaseName: barber_academy
+    region: frankfurt
+    plan: free

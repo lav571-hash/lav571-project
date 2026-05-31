@@ -8,15 +8,13 @@ import {
   Body,
   Query,
   UseGuards,
-  UseInterceptors,
-  UploadedFile,
+  Optional,
 } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
   ApiBearerAuth,
   ApiQuery,
-  ApiConsumes,
 } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { CoursesService } from './courses.service';
@@ -26,6 +24,7 @@ import { AddMaterialDto } from './dto/add-material.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
+import { Public } from '../common/decorators/public.decorator';
 import { UserRole } from '../database/entities/user.entity';
 import { CourseLevel, CourseStatus, CourseType } from '../database/entities/course.entity';
 
@@ -59,21 +58,38 @@ export class CoursesController {
   }
 
   @Get('published')
-  @ApiOperation({ summary: 'Опубликованные курсы (каталог для учеников)' })
+  @Public()
+  @ApiOperation({ summary: 'Опубликованные курсы (публичный доступ)' })
   findPublished() {
     return this.coursesService.findPublished();
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Подробности курса' })
+  @Public()
+  @ApiOperation({ summary: 'Подробности курса (публичный доступ)' })
   findOne(@Param('id') id: string) {
     return this.coursesService.findOne(id);
   }
 
   @Get(':id/seats')
-  @ApiOperation({ summary: 'Количество свободных мест' })
+  @Public()
+  @ApiOperation({ summary: 'Количество свободных мест (публичный доступ)' })
   getSeats(@Param('id') id: string) {
     return this.coursesService.getAvailableSeats(id).then((seats) => ({ seats }));
+  }
+
+  @Get(':id/sessions')
+  @Public()
+  @ApiOperation({ summary: 'Расписание занятий курса (публичный доступ)' })
+  getSessions(@Param('id') id: string) {
+    return this.coursesService.getSessions(id);
+  }
+
+  @Get(':id/materials')
+  @Public()
+  @ApiOperation({ summary: 'Учебные материалы курса (публичный доступ)' })
+  getMaterials(@Param('id') id: string) {
+    return this.coursesService.getMaterials(id);
   }
 
   @Patch(':id')
@@ -105,12 +121,6 @@ export class CoursesController {
     return this.coursesService.addSession(id, dto);
   }
 
-  @Get(':id/sessions')
-  @ApiOperation({ summary: 'Расписание занятий курса' })
-  getSessions(@Param('id') id: string) {
-    return this.coursesService.getSessions(id);
-  }
-
   @Delete(':id/sessions/:sessionId')
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Удалить занятие' })
@@ -124,12 +134,6 @@ export class CoursesController {
   @ApiOperation({ summary: 'Добавить материал к курсу' })
   addMaterial(@Param('id') id: string, @Body() dto: AddMaterialDto) {
     return this.coursesService.addMaterial(id, dto);
-  }
-
-  @Get(':id/materials')
-  @ApiOperation({ summary: 'Учебные материалы курса' })
-  getMaterials(@Param('id') id: string) {
-    return this.coursesService.getMaterials(id);
   }
 
   @Delete(':id/materials/:materialId')
