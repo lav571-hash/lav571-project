@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { BullModule } from '@nestjs/bull';
 import { ScheduleModule } from '@nestjs/schedule';
 
+import { DatabaseModule } from './database/database.module';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { CoursesModule } from './courses/courses.module';
@@ -50,6 +51,7 @@ import { Setting } from './database/entities/setting.entity';
 
     ScheduleModule.forRoot(),
 
+    DatabaseModule,
     AuthModule,
     UsersModule,
     CoursesModule,
