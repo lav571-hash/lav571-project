@@ -14,8 +14,10 @@ User _$UserFromJson(Map<String, dynamic> json) => User(
       phone: json['phone'] as String?,
       pushToken: json['pushToken'] as String?,
       telegramChatId: json['telegramChatId'] as String?,
-      isActive: json['isActive'] as bool,
-      createdAt: DateTime.parse(json['createdAt'] as String),
+      isActive: json['isActive'] as bool?,
+      createdAt: json['createdAt'] == null
+          ? null
+          : DateTime.parse(json['createdAt'] as String),
     );
 
 Map<String, dynamic> _$UserToJson(User instance) => <String, dynamic>{
@@ -27,7 +29,7 @@ Map<String, dynamic> _$UserToJson(User instance) => <String, dynamic>{
       'pushToken': instance.pushToken,
       'telegramChatId': instance.telegramChatId,
       'isActive': instance.isActive,
-      'createdAt': instance.createdAt.toIso8601String(),
+      'createdAt': instance.createdAt?.toIso8601String(),
     };
 
 const _$UserRoleEnumMap = {

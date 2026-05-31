@@ -20,8 +20,8 @@ class User {
   final String? phone;
   final String? pushToken;
   final String? telegramChatId;
-  final bool isActive;
-  final DateTime createdAt;
+  final bool? isActive;
+  final DateTime? createdAt;
 
   const User({
     required this.id,
@@ -31,8 +31,8 @@ class User {
     this.phone,
     this.pushToken,
     this.telegramChatId,
-    required this.isActive,
-    required this.createdAt,
+    this.isActive,
+    this.createdAt,
   });
 
   factory User.fromJson(Map<String, dynamic> json) => _$UserFromJson(json);

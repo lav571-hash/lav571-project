@@ -61,6 +61,11 @@ export class AuthService {
         email: user.email,
         fullName: user.fullName,
         role: user.role,
+        phone: user.phone ?? null,
+        pushToken: user.pushToken ?? null,
+        telegramChatId: user.telegramChatId ?? null,
+        isActive: user.isActive,
+        createdAt: user.createdAt,
       },
     };
   }
