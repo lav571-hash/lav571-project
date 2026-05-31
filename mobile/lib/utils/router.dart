@@ -7,6 +7,7 @@ import '../screens/catalog/catalog_screen.dart';
 import '../screens/catalog/course_detail_screen.dart';
 import '../screens/profile/profile_screen.dart';
 import '../screens/admin/admin_screen.dart';
+import '../screens/admin/create_course_screen.dart';
 import '../providers/auth_provider.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -55,6 +56,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, state) => CourseDetailScreen(
           courseId: state.pathParameters['id']!,
         ),
+      ),
+      GoRoute(
+        path: '/admin/courses/create',
+        builder: (_, __) => const CreateCourseScreen(),
       ),
     ],
   );
