@@ -185,3 +185,12 @@ AWS_SECRET_ACCESS_KEY=minioadmin
 ## Нереализованный функционал
 
 См. подробный список: **[BACKLOG.md](./BACKLOG.md)**
+
+## Демо-доступ
+
+| | URL |
+|--|--|
+| **Веб-приложение** | https://lav571-hash.github.io/lav571-project/ |
+| **API (временный)** | https://happens-spider-matthew-therapeutic.trycloudflare.com/api/v1 |
+| **Swagger** | https://happens-spider-matthew-therapeutic.trycloudflare.com/api/docs |
+
