@@ -1,0 +1,156 @@
+import 'package:blackwire_protocol/data/content/equipment_catalog.dart';
+import 'package:blackwire_protocol/data/models/faction.dart';
+import 'package:blackwire_protocol/data/models/mission_site.dart';
+import 'package:blackwire_protocol/features/tactical/tactical_screen.dart';
+import 'package:blackwire_protocol/game/battle_controller.dart';
+import 'package:blackwire_protocol/game/map/tactical_map.dart';
+import 'package:blackwire_protocol/game/map/tile.dart';
+import 'package:blackwire_protocol/game/units/tactical_unit.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+/// [TacticalScreen] hosts a Flame [GameWidget] with a continuously running
+/// game loop ticker, so `pumpAndSettle` never settles on it. Use a bounded
+/// number of frame pumps instead.
+Future<void> _pumpFrames(WidgetTester tester, {int times = 6}) async {
+  for (var i = 0; i < times; i++) {
+    await tester.pump(const Duration(milliseconds: 100));
+  }
+}
+
+MissionSite _mission() => const MissionSite(
+  id: 'm1',
+  factionId: EnemyFactionId.titanDynamics,
+  type: MissionType.raid,
+  regionName: 'Test Sector',
+  x: 0.5,
+  y: 0.5,
+  difficulty: 1,
+  secondsRemaining: 100,
+  totalLifetimeSeconds: 100,
+);
+
+TacticalUnit _playerUnit({int hp = 100}) => TacticalUnit(
+  id: 'p1',
+  team: Team.player,
+  displayName: 'Reclaim-1',
+  maxHp: 100,
+  position: const GridPos(1, 1),
+  movementRange: 5,
+  baseAccuracy: 65,
+  weapon: kWeaponCatalog['pistol_mk1']!,
+  currentHp: hp,
+);
+
+void main() {
+  testWidgets(
+    'renders mission info and turn indicator before the battle concludes',
+    (tester) async {
+      final map = TacticalMap(width: 6, height: 6);
+      final enemy = TacticalUnit(
+        id: 'e1',
+        team: Team.enemy,
+        displayName: 'Test Merc',
+        maxHp: 50,
+        position: const GridPos(4, 1),
+        movementRange: 4,
+        baseAccuracy: 10,
+        weapon: kWeaponCatalog['pistol_mk1']!,
+      );
+      final controller = BattleController(
+        map: map,
+        units: [_playerUnit(), enemy],
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) => ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).push<BattleController>(
+                  MaterialPageRoute(
+                    builder: (_) => TacticalScreen(
+                      controller: controller,
+                      mission: _mission(),
+                    ),
+                  ),
+                );
+              },
+              child: const Text('open'),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('open'));
+      await _pumpFrames(tester);
+
+      // Turn indicator and mission info render correctly.
+      expect(find.textContaining('Test Sector'), findsOneWidget);
+      expect(find.textContaining('ХОД 1'), findsOneWidget);
+
+      // No overlay yet since the battle has not concluded.
+      expect(find.text('МИССИЯ ВЫПОЛНЕНА'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'victory overlay appears and returning navigates back with the controller',
+    (tester) async {
+      final map = TacticalMap(width: 6, height: 6);
+      final enemy = TacticalUnit(
+        id: 'e1',
+        team: Team.enemy,
+        displayName: 'Test Merc',
+        maxHp: 1,
+        position: const GridPos(2, 1),
+        movementRange: 4,
+        baseAccuracy: 10,
+        weapon: kWeaponCatalog['pistol_mk1']!,
+        currentHp: 0, // already dead.
+      );
+      final controller = BattleController(
+        map: map,
+        units: [_playerUnit(), enemy],
+      );
+
+      // The enemy is already dead (currentHp: 0), so ending the player's turn
+      // triggers the same win-condition check the real game runs after every
+      // kill, and the battle should resolve to victory immediately.
+      controller.endPlayerTurn();
+      expect(controller.phase, BattlePhase.victory);
+
+      BattleController? poppedResult;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) => ElevatedButton(
+              onPressed: () async {
+                poppedResult = await Navigator.of(context)
+                    .push<BattleController>(
+                      MaterialPageRoute(
+                        builder: (_) => TacticalScreen(
+                          controller: controller,
+                          mission: _mission(),
+                        ),
+                      ),
+                    );
+              },
+              child: const Text('open'),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('open'));
+      await _pumpFrames(tester);
+
+      expect(find.text('МИССИЯ ВЫПОЛНЕНА'), findsOneWidget);
+
+      await tester.tap(find.text('ВЕРНУТЬСЯ НА БАЗУ'));
+      await _pumpFrames(tester);
+
+      expect(poppedResult, same(controller));
+    },
+  );
+}
