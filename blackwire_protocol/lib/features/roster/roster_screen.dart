@@ -3,8 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/constants.dart';
 import '../../data/content/equipment_catalog.dart';
+import '../../data/content/skill_catalog.dart';
 import '../../data/models/soldier.dart';
+import '../../data/models/specialization.dart';
 import '../../state/game_state_notifier.dart';
+import 'promotion_dialog.dart';
 
 class RosterScreen extends ConsumerWidget {
   const RosterScreen({super.key});
@@ -59,6 +62,83 @@ class RosterScreen extends ConsumerWidget {
                 ),
         ),
       ],
+    );
+  }
+}
+
+class _StatRow extends StatelessWidget {
+  final Soldier soldier;
+  const _StatRow({required this.soldier});
+
+  @override
+  Widget build(BuildContext context) {
+    final xpForNext = soldier.xpForNextRank;
+    final xpProgress = soldier.rank >= 10
+        ? 1.0
+        : (soldier.xp / (xpForNext == 0 ? 1 : xpForNext)).clamp(0.0, 1.0);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            _statChip(Icons.favorite, '${soldier.maxHp}', AppColors.neonGreen),
+            _statChip(
+              Icons.track_changes,
+              '${soldier.baseAccuracy}',
+              AppColors.neonCyan,
+            ),
+            _statChip(
+              Icons.directions_run,
+              '${soldier.movementRange}',
+              AppColors.neonYellow,
+            ),
+            _statChip(
+              Icons.psychology,
+              '${soldier.willpower}',
+              AppColors.neonMagenta,
+            ),
+          ],
+        ),
+        if (soldier.rank < 10) ...[
+          const SizedBox(height: 4),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(3),
+            child: LinearProgressIndicator(
+              value: xpProgress,
+              minHeight: 4,
+              backgroundColor: Colors.black45,
+              color: AppColors.neonCyan,
+            ),
+          ),
+          Text(
+            'XP ${soldier.xp}/$xpForNext',
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 10,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _statChip(IconData icon, String value, Color color) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 12),
+      child: Row(
+        children: [
+          Icon(icon, size: 13, color: color),
+          const SizedBox(width: 3),
+          Text(
+            value,
+            style: TextStyle(
+              color: color,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -123,6 +203,14 @@ class _SoldierCard extends ConsumerWidget {
                         ),
                       ),
                       Text(
+                        '${soldier.rankName} (Ранг ${soldier.rank})'
+                        '${soldier.specialization != null ? ' · ${kSpecializationDefs[soldier.specialization]!.name}' : ''}',
+                        style: const TextStyle(
+                          color: AppColors.neonCyan,
+                          fontSize: 11,
+                        ),
+                      ),
+                      Text(
                         statusLabel,
                         style: TextStyle(color: statusColor, fontSize: 12),
                       ),
@@ -138,6 +226,25 @@ class _SoldierCard extends ConsumerWidget {
                 ),
               ],
             ),
+            if (soldier.status != SoldierStatus.dead) ...[
+              const SizedBox(height: 8),
+              _StatRow(soldier: soldier),
+            ],
+            if (soldier.hasPendingPromotion) ...[
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () => showPromotionDialog(context, ref, soldier),
+                  icon: const Icon(Icons.military_tech, size: 18),
+                  label: const Text('ПОВЫШЕНИЕ ДОСТУПНО!'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.neonYellow,
+                    foregroundColor: Colors.black,
+                  ),
+                ),
+              ),
+            ],
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
@@ -165,6 +272,25 @@ class _SoldierCard extends ConsumerWidget {
                   ),
               ],
             ),
+            if (soldier.unlockedSkillIds.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 6,
+                runSpacing: 4,
+                children: soldier.unlockedSkillIds.map((id) {
+                  final def = SkillCatalog.all[id];
+                  return Chip(
+                    label: Text(
+                      def?.name ?? id,
+                      style: const TextStyle(fontSize: 11),
+                    ),
+                    backgroundColor: AppColors.surfaceAlt,
+                    labelStyle: const TextStyle(color: AppColors.textPrimary),
+                    visualDensity: VisualDensity.compact,
+                  );
+                }).toList(),
+              ),
+            ],
           ],
         ),
       ),

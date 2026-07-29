@@ -34,6 +34,11 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       return _GameOverScreen(chaos: save.chaosLevel);
     }
 
+    final pendingPromotions = ref
+        .read(gameStateProvider.notifier)
+        .soldiersWithPendingPromotion
+        .length;
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
@@ -51,11 +56,25 @@ class _HomeShellState extends ConsumerState<HomeShell> {
         indicatorColor: AppColors.neonCyan.withValues(alpha: 0.2),
         selectedIndex: _tabIndex,
         onDestinationSelected: (i) => setState(() => _tabIndex = i),
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.apartment), label: 'База'),
-          NavigationDestination(icon: Icon(Icons.public), label: 'Геоскейп'),
-          NavigationDestination(icon: Icon(Icons.groups), label: 'Отряд'),
+        destinations: [
+          const NavigationDestination(
+            icon: Icon(Icons.apartment),
+            label: 'База',
+          ),
+          const NavigationDestination(
+            icon: Icon(Icons.public),
+            label: 'Геоскейп',
+          ),
           NavigationDestination(
+            icon: pendingPromotions > 0
+                ? Badge(
+                    label: Text('$pendingPromotions'),
+                    child: const Icon(Icons.groups),
+                  )
+                : const Icon(Icons.groups),
+            label: 'Отряд',
+          ),
+          const NavigationDestination(
             icon: Icon(Icons.science),
             label: 'Исследования',
           ),

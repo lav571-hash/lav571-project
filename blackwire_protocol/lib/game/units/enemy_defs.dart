@@ -4,6 +4,11 @@ import '../../data/models/faction.dart';
 
 /// Base stat block for an enemy archetype belonging to a faction. Stats are
 /// mildly scaled by mission difficulty (1-5) when instantiated.
+///
+/// Each faction has one signature "fear attack": instead of a normal shot,
+/// the enemy has a [fearAttackChance] chance to unleash it, forcing a Will
+/// check (see `BattleController`) on the target and any other player units
+/// within [fearAttackRadius] tiles.
 class EnemyDef {
   final EnemyFactionId factionId;
   final String name;
@@ -12,6 +17,9 @@ class EnemyDef {
   final int baseAccuracy;
   final WeaponDef weapon;
   final int damageReduction;
+  final String fearAttackName;
+  final double fearAttackChance;
+  final int fearAttackRadius;
 
   const EnemyDef({
     required this.factionId,
@@ -21,6 +29,9 @@ class EnemyDef {
     required this.baseAccuracy,
     required this.weapon,
     this.damageReduction = 0,
+    required this.fearAttackName,
+    this.fearAttackChance = 0.25,
+    this.fearAttackRadius = 3,
   });
 }
 
@@ -33,6 +44,7 @@ final Map<EnemyFactionId, EnemyDef> kEnemyDefs = {
     baseAccuracy: 58,
     weapon: kWeaponCatalog['rifle_mk1']!,
     damageReduction: 1,
+    fearAttackName: 'Светошумовая граната',
   ),
   EnemyFactionId.nexusRobotics: EnemyDef(
     factionId: EnemyFactionId.nexusRobotics,
@@ -42,6 +54,7 @@ final Map<EnemyFactionId, EnemyDef> kEnemyDefs = {
     baseAccuracy: 54,
     weapon: kWeaponCatalog['pistol_mk1']!,
     damageReduction: 2,
+    fearAttackName: 'Подавляющий огонь',
   ),
   EnemyFactionId.chimeraLabs: EnemyDef(
     factionId: EnemyFactionId.chimeraLabs,
@@ -51,5 +64,6 @@ final Map<EnemyFactionId, EnemyDef> kEnemyDefs = {
     baseAccuracy: 48,
     weapon: kWeaponCatalog['smg_arc']!,
     damageReduction: 0,
+    fearAttackName: 'Рёв ужаса',
   ),
 };

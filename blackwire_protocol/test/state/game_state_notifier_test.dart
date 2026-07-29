@@ -4,6 +4,7 @@ import 'package:blackwire_protocol/data/content/equipment_catalog.dart';
 import 'package:blackwire_protocol/data/models/faction.dart';
 import 'package:blackwire_protocol/data/models/mission_site.dart';
 import 'package:blackwire_protocol/data/models/soldier.dart';
+import 'package:blackwire_protocol/data/models/specialization.dart';
 import 'package:blackwire_protocol/game/battle_controller.dart';
 import 'package:blackwire_protocol/game/combat/combat_resolver.dart';
 import 'package:blackwire_protocol/game/map/tactical_map.dart';
@@ -305,5 +306,130 @@ void main() {
         containsAll(['rifle_mk1', 'smg_arc']),
       );
     });
+  });
+
+  group('GameStateNotifier rank progression choices', () {
+    test('chooseSpecialization resolves a pending Rank 1 promotion', () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final notifier = container.read(gameStateProvider.notifier);
+      const soldier = Soldier(id: 's1', name: 'Test', rank: 1);
+      notifier.loadSave(
+        container.read(gameStateProvider).copyWith(soldiers: [soldier]),
+      );
+
+      expect(notifier.soldiersWithPendingPromotion, hasLength(1));
+      final ok = notifier.chooseSpecialization(
+        soldier.id,
+        Specialization.sniper,
+      );
+      expect(ok, isTrue);
+
+      final updated = container.read(gameStateProvider).soldiers.first;
+      expect(updated.specialization, Specialization.sniper);
+      expect(notifier.soldiersWithPendingPromotion, isEmpty);
+    });
+
+    test('chooseSkill only accepts one of the currently offered options', () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final notifier = container.read(gameStateProvider.notifier);
+      const soldier = Soldier(
+        id: 's1',
+        name: 'Test',
+        rank: 2,
+        specialization: Specialization.heavy,
+      );
+      notifier.loadSave(
+        container.read(gameStateProvider).copyWith(soldiers: [soldier]),
+      );
+
+      final offered = notifier.skillChoicesFor(soldier);
+      expect(offered, hasLength(2));
+
+      final rejected = notifier.chooseSkill(soldier.id, 'not_a_real_skill');
+      expect(rejected, isFalse);
+
+      final ok = notifier.chooseSkill(soldier.id, offered.first.id);
+      expect(ok, isTrue);
+
+      final updated = container.read(gameStateProvider).soldiers.first;
+      expect(updated.unlockedSkillIds, [offered.first.id]);
+      expect(updated.hasPendingSkillChoice, isFalse);
+    });
+
+    test(
+      'rank-up choices unlock sequentially through a full mission chain',
+      () {
+        final container = ProviderContainer();
+        addTearDown(container.dispose);
+        final notifier = container.read(gameStateProvider.notifier);
+
+        final resolver = CombatResolver(random: _AlwaysZeroRandom());
+        const starter = Soldier(id: 'chain_soldier', name: 'Test');
+        notifier.loadSave(
+          container.read(gameStateProvider).copyWith(soldiers: [starter]),
+        );
+        var soldiers = container.read(gameStateProvider).soldiers;
+        final soldierId = soldiers.first.id;
+
+        for (var i = 0; i < 3; i++) {
+          final mission = _mission();
+          notifier.loadSave(
+            container
+                .read(gameStateProvider)
+                .copyWith(activeMissions: [mission]),
+          );
+          final map = TacticalMap(width: 6, height: 6);
+          final unit = TacticalUnit(
+            id: 'p1',
+            team: Team.player,
+            displayName: 'Test',
+            maxHp: 100,
+            position: const GridPos(1, 1),
+            movementRange: 5,
+            baseAccuracy: 90,
+            weapon: kWeaponCatalog['rifle_mk1']!,
+            soldierId: soldierId,
+          );
+          final enemy = TacticalUnit(
+            id: 'e1',
+            team: Team.enemy,
+            displayName: 'Enemy',
+            maxHp: 1,
+            position: const GridPos(2, 1),
+            movementRange: 4,
+            baseAccuracy: 10,
+            weapon: kWeaponCatalog['pistol_mk1']!,
+          );
+          final battle = BattleController(
+            map: map,
+            units: [unit, enemy],
+            combatResolver: resolver,
+          );
+          battle.selectUnit('p1');
+          battle.attackTarget('e1');
+          expect(battle.phase, BattlePhase.victory);
+
+          notifier.resolveMission(
+            mission: mission,
+            battle: battle,
+            squadSoldierIds: [soldierId],
+          );
+          soldiers = container.read(gameStateProvider).soldiers;
+        }
+
+        final progressed = soldiers.firstWhere((s) => s.id == soldierId);
+        expect(progressed.rank, greaterThanOrEqualTo(1));
+        expect(progressed.hasPendingSpecializationChoice, isTrue);
+
+        notifier.chooseSpecialization(soldierId, Specialization.assault);
+        final withSpec = container
+            .read(gameStateProvider)
+            .soldiers
+            .firstWhere((s) => s.id == soldierId);
+        expect(withSpec.specialization, Specialization.assault);
+      },
+    );
   });
 }

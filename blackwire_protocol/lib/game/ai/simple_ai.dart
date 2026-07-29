@@ -5,6 +5,7 @@ import '../map/line_of_sight.dart';
 import '../map/pathfinding.dart';
 import '../map/tactical_map.dart';
 import '../map/tile.dart';
+import '../units/enemy_defs.dart';
 import '../units/tactical_unit.dart';
 
 class AiTurnResult {
@@ -13,11 +14,18 @@ class AiTurnResult {
   final TacticalUnit? attackedTarget;
   final AttackResult? attackResult;
 
+  /// Non-empty when this attack was a faction "fear attack" - every unit
+  /// listed here must roll a Will (panic) check.
+  final List<TacticalUnit> panicTargets;
+  final String? fearAttackName;
+
   const AiTurnResult({
     required this.enemy,
     this.movePath,
     this.attackedTarget,
     this.attackResult,
+    this.panicTargets = const [],
+    this.fearAttackName,
   });
 }
 
@@ -119,9 +127,26 @@ class SimpleAi {
     }
 
     AttackResult? attackResult;
+    List<TacticalUnit> panicTargets = const [];
+    String? fearAttackName;
     if (inRangeTarget != null) {
       attackResult = combatResolver.resolveAttack(map, enemy, inRangeTarget);
       enemy.hasActed = true;
+
+      final enemyDef = enemy.enemyFactionId == null
+          ? null
+          : kEnemyDefs[enemy.enemyFactionId];
+      if (enemyDef != null && random.nextDouble() < enemyDef.fearAttackChance) {
+        fearAttackName = enemyDef.fearAttackName;
+        panicTargets = targets
+            .where((t) => t.isAlive)
+            .where(
+              (t) =>
+                  t.position.distanceTo(inRangeTarget!.position) <=
+                  enemyDef.fearAttackRadius,
+            )
+            .toList();
+      }
     }
 
     enemy.hasMoved = true; // Enemies use their whole turn at once in the MVP.
@@ -132,6 +157,8 @@ class SimpleAi {
       movePath: movePath,
       attackedTarget: inRangeTarget,
       attackResult: attackResult,
+      panicTargets: panicTargets,
+      fearAttackName: fearAttackName,
     );
   }
 

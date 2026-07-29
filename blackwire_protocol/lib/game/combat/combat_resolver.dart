@@ -13,6 +13,7 @@ class AttackResult {
   final int hitChance;
   final CoverLevel cover;
   final bool targetKilled;
+  final bool wasCrit;
 
   const AttackResult({
     required this.hit,
@@ -20,6 +21,7 @@ class AttackResult {
     required this.hitChance,
     required this.cover,
     required this.targetKilled,
+    this.wasCrit = false,
   });
 }
 
@@ -65,7 +67,7 @@ class CombatResolver {
   bool canAttack(TacticalMap map, TacticalUnit shooter, TacticalUnit target) {
     if (!target.isAlive || !shooter.isAlive) return false;
     final distance = shooter.position.chebyshevDistanceTo(target.position);
-    if (distance > shooter.weapon.range) return false;
+    if (distance > shooter.effectiveWeaponRange) return false;
     return LineOfSight.hasLineOfSight(map, shooter.position, target.position);
   }
 
@@ -75,7 +77,8 @@ class CombatResolver {
     TacticalUnit target,
   ) {
     final distance = shooter.position.chebyshevDistanceTo(target.position);
-    final distancePenalty = (distance / shooter.weapon.range * 15).round();
+    final distancePenalty = (distance / shooter.effectiveWeaponRange * 15)
+        .round();
     final cover = coverLevelFor(map, target.position, shooter.position);
     final chance =
         shooter.weapon.baseAccuracy +
@@ -85,23 +88,42 @@ class CombatResolver {
     return chance.clamp(5, 95);
   }
 
+  /// Resolves an attack from [shooter] on [target], mutating both the
+  /// target's HP and the shooter's per-mission `shotsFired`/`hits`/`kills`
+  /// tallies (used later to grow the underlying soldier's stats through
+  /// practice). Pass [accuracyPenalty] to reduce the hit chance for special
+  /// cases such as panicked gunfire.
   AttackResult resolveAttack(
     TacticalMap map,
     TacticalUnit shooter,
-    TacticalUnit target,
-  ) {
+    TacticalUnit target, {
+    int accuracyPenalty = 0,
+  }) {
     final cover = coverLevelFor(map, target.position, shooter.position);
-    final hitChance = computeHitChance(map, shooter, target);
+    final hitChance = (computeHitChance(map, shooter, target) - accuracyPenalty)
+        .clamp(5, 95);
     final roll = random.nextInt(100);
     final hit = roll < hitChance;
+    shooter.shotsFired++;
     int damage = 0;
+    bool wasCrit = false;
     if (hit) {
       damage =
           shooter.weapon.minDamage +
           random.nextInt(
             shooter.weapon.maxDamage - shooter.weapon.minDamage + 1,
-          );
+          ) +
+          shooter.weaponDamageBonus;
+      if (shooter.critChance > 0 && random.nextInt(100) < shooter.critChance) {
+        wasCrit = true;
+        damage = (damage * 1.5).round();
+      }
       target.applyDamage(damage);
+      if (target.isAlive) {
+        shooter.hits++;
+      } else {
+        shooter.kills++;
+      }
     }
     return AttackResult(
       hit: hit,
@@ -109,6 +131,7 @@ class CombatResolver {
       hitChance: hitChance,
       cover: cover,
       targetKilled: hit && !target.isAlive,
+      wasCrit: wasCrit,
     );
   }
 }

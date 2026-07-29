@@ -48,17 +48,23 @@ class BattleFactory {
       final armor = soldier.armorId != null
           ? kArmorCatalog[soldier.armorId]
           : null;
+      final bonuses = soldier.skillBonuses;
       units.add(
         TacticalUnit(
           id: 'unit_${soldier.id}',
           team: Team.player,
           displayName: soldier.name,
-          maxHp: soldier.maxHp + (armor?.bonusHp ?? 0),
+          maxHp: soldier.maxHp + (armor?.bonusHp ?? 0) + bonuses.hp,
           position: i < playerSpawns.length ? playerSpawns[i] : GridPos(1, 1),
-          movementRange: soldier.movementRange,
-          baseAccuracy: soldier.baseAccuracy,
+          movementRange: soldier.movementRange + bonuses.movement,
+          baseAccuracy: soldier.baseAccuracy + bonuses.accuracy,
           weapon: weapon,
-          damageReduction: armor?.damageReduction ?? 0,
+          damageReduction:
+              (armor?.damageReduction ?? 0) + bonuses.damageReduction,
+          weaponDamageBonus: bonuses.weaponDamage,
+          weaponRangeBonus: bonuses.weaponRange,
+          critChance: bonuses.critChance,
+          willpower: soldier.willpower + bonuses.will,
           soldierId: soldier.id,
         ),
       );

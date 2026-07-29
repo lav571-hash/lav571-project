@@ -6,17 +6,21 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants.dart';
 import '../data/content/equipment_catalog.dart';
 import '../data/content/research_catalog.dart';
+import '../data/content/skill_catalog.dart';
 import '../data/models/faction.dart';
 import '../data/models/game_save.dart';
 import '../data/models/mission_result.dart';
 import '../data/models/mission_site.dart';
 import '../data/models/research.dart';
 import '../data/models/resources.dart';
+import '../data/models/skill.dart';
 import '../data/models/soldier.dart';
+import '../data/models/specialization.dart';
 import '../data/repositories/save_repository.dart';
 import '../game/battle_controller.dart';
 import '../game/battle_factory.dart';
 import '../game/geoscape/mission_generator.dart';
+import '../game/soldier_progression.dart';
 
 class FacilityCosts {
   static const Map<String, int> creditCostPerLevel = {
@@ -233,6 +237,52 @@ class GameStateNotifier extends Notifier<GameSave> {
   }
 
   // ---------------------------------------------------------------------
+  // Rank progression: specialization & skill choices
+  // ---------------------------------------------------------------------
+
+  List<Soldier> get soldiersWithPendingPromotion =>
+      state.soldiers.where((s) => s.hasPendingPromotion).toList();
+
+  bool chooseSpecialization(String soldierId, Specialization specialization) {
+    final soldiers = [...state.soldiers];
+    final index = soldiers.indexWhere((s) => s.id == soldierId);
+    if (index == -1) return false;
+    final soldier = soldiers[index];
+    if (!soldier.hasPendingSpecializationChoice) return false;
+
+    soldiers[index] = soldier.copyWith(specialization: specialization);
+    state = state.copyWith(soldiers: soldiers);
+    unawaited(_persist());
+    return true;
+  }
+
+  /// The 2 skill options currently offered to [soldier], or an empty list
+  /// if they have no pending skill choice.
+  List<SkillDef> skillChoicesFor(Soldier soldier) {
+    if (!soldier.hasPendingSkillChoice || soldier.specialization == null) {
+      return const [];
+    }
+    final nextSkillRank = soldier.unlockedSkillIds.length + 2;
+    return SkillCatalog.choicesForRank(soldier.specialization!, nextSkillRank);
+  }
+
+  bool chooseSkill(String soldierId, String skillId) {
+    final soldiers = [...state.soldiers];
+    final index = soldiers.indexWhere((s) => s.id == soldierId);
+    if (index == -1) return false;
+    final soldier = soldiers[index];
+    final options = skillChoicesFor(soldier);
+    if (options.isEmpty || !options.any((s) => s.id == skillId)) return false;
+
+    soldiers[index] = soldier.copyWith(
+      unlockedSkillIds: [...soldier.unlockedSkillIds, skillId],
+    );
+    state = state.copyWith(soldiers: soldiers);
+    unawaited(_persist());
+    return true;
+  }
+
+  // ---------------------------------------------------------------------
   // Base facilities
   // ---------------------------------------------------------------------
 
@@ -399,21 +449,37 @@ class GameStateNotifier extends Notifier<GameSave> {
         updatedSoldiers[index] = updatedSoldiers[index].copyWith(
           status: SoldierStatus.dead,
         );
-      } else if (unit.hpFraction < 0.5) {
+        continue;
+      }
+
+      final becameWounded = unit.hpFraction < 0.5;
+      var soldier = updatedSoldiers[index].copyWith(
+        missionsSurvived: updatedSoldiers[index].missionsSurvived + 1,
+      );
+
+      if (becameWounded) {
         final recoveryDays = 2 + ((1 - unit.hpFraction) * 6).round();
-        wounded.add(updatedSoldiers[index].name);
-        updatedSoldiers[index] = updatedSoldiers[index].copyWith(
+        wounded.add(soldier.name);
+        soldier = soldier.copyWith(
           status: SoldierStatus.wounded,
           currentHp: unit.currentHp,
           recoveryDaysLeft: recoveryDays,
-          missionsSurvived: updatedSoldiers[index].missionsSurvived + 1,
         );
       } else {
-        updatedSoldiers[index] = updatedSoldiers[index].copyWith(
-          currentHp: updatedSoldiers[index].maxHp,
-          missionsSurvived: updatedSoldiers[index].missionsSurvived + 1,
-        );
+        soldier = soldier.copyWith(currentHp: soldier.maxHp);
       }
+
+      soldier = SoldierProgression.applyPracticeGrowth(
+        soldier,
+        unit,
+        becameWounded: becameWounded,
+      );
+      soldier = SoldierProgression.applyXpAndRankUp(
+        soldier,
+        SoldierProgression.computeXp(unit),
+      );
+
+      updatedSoldiers[index] = soldier;
     }
     final rosterAfterDeaths = updatedSoldiers
         .where((s) => s.status != SoldierStatus.dead)

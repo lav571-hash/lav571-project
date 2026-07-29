@@ -44,4 +44,42 @@ class GameConfig {
   static const double meanSecondsBetweenMissions = 26.0;
   static const int maxActiveMissions = 5;
   static const int maxSquadSize = 4;
+
+  // --- Rank / XP progression --------------------------------------------
+  /// Cumulative XP required to be at rank index N (index 0 == rank 1, the
+  /// starting rank at which a soldier picks their specialization).
+  static const List<int> rankXpThresholds = [
+    0,
+    30,
+    70,
+    120,
+    190,
+    280,
+    400,
+    550,
+    750,
+    1000,
+  ];
+  static const int maxRank = 10;
+  static const int xpPerMissionParticipation = 10;
+  static const int xpPerKill = 15;
+  static const int xpPerHit = 3;
+
+  // --- Practice-based stat growth ----------------------------------------
+  static const int hpGainPerWound = 3;
+  static const int movementMissionsPerBonus = 5;
+  static const int maxMovementBonusStacks = 3;
+  static const int willSuccessfulActionsPerBonus = 3;
+
+  /// Per-mission shots-fired thresholds -> accuracy bonus (highest reached
+  /// threshold wins, does not stack).
+  static const Map<int, int> accuracyShotThresholds = {3: 1, 9: 2, 27: 3};
+
+  static const int startingWillpower = 50;
+
+  // --- Panic (Will checks) ------------------------------------------------
+  static const int basePanicChance = 70; // minus willpower, clamped below.
+  static const int minPanicChance = 5;
+  static const int maxPanicChance = 95;
+  static const int panicFireAccuracyPenalty = 20;
 }
