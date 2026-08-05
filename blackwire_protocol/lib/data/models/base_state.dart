@@ -1,3 +1,5 @@
+import '../../core/constants.dart';
+
 /// Levels of every base facility. Each level increases capacity/output.
 ///
 /// - barracksLevel  -> roster capacity
@@ -5,12 +7,14 @@
 /// - labLevel       -> research speed
 /// - hangarLevel    -> number of simultaneous missions that can be launched
 /// - warehouseLevel -> resource storage cap (materials & data)
+/// - medbayLevel    -> wound recovery speed and intensive care efficiency
 class BaseState {
   final int barracksLevel;
   final int workshopLevel;
   final int labLevel;
   final int hangarLevel;
   final int warehouseLevel;
+  final int medbayLevel;
 
   const BaseState({
     this.barracksLevel = 1,
@@ -18,11 +22,15 @@ class BaseState {
     this.labLevel = 1,
     this.hangarLevel = 1,
     this.warehouseLevel = 1,
+    this.medbayLevel = 1,
   });
 
   int get rosterCapacity => 4 + (barracksLevel - 1) * 2;
   int get parallelMissionSlots => hangarLevel;
   int get resourceStorageCap => 100 + (warehouseLevel - 1) * 100;
+  double get recoverySpeedMultiplier =>
+      1 + (medbayLevel - 1) * GameConfig.medbayRecoveryBonusPerLevel;
+  double get intensiveCareDays => 1 + medbayLevel;
 
   BaseState copyWith({
     int? barracksLevel,
@@ -30,12 +38,14 @@ class BaseState {
     int? labLevel,
     int? hangarLevel,
     int? warehouseLevel,
+    int? medbayLevel,
   }) => BaseState(
     barracksLevel: barracksLevel ?? this.barracksLevel,
     workshopLevel: workshopLevel ?? this.workshopLevel,
     labLevel: labLevel ?? this.labLevel,
     hangarLevel: hangarLevel ?? this.hangarLevel,
     warehouseLevel: warehouseLevel ?? this.warehouseLevel,
+    medbayLevel: medbayLevel ?? this.medbayLevel,
   );
 
   Map<String, dynamic> toJson() => {
@@ -44,6 +54,7 @@ class BaseState {
     'labLevel': labLevel,
     'hangarLevel': hangarLevel,
     'warehouseLevel': warehouseLevel,
+    'medbayLevel': medbayLevel,
   };
 
   factory BaseState.fromJson(Map<String, dynamic> json) => BaseState(
@@ -52,6 +63,7 @@ class BaseState {
     labLevel: json['labLevel'] as int? ?? 1,
     hangarLevel: json['hangarLevel'] as int? ?? 1,
     warehouseLevel: json['warehouseLevel'] as int? ?? 1,
+    medbayLevel: json['medbayLevel'] as int? ?? 1,
   );
 }
 

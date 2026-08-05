@@ -45,6 +45,11 @@ class GameConfig {
   static const int maxActiveMissions = 5;
   static const int maxSquadSize = 4;
 
+  // --- Medbay ------------------------------------------------------------
+  static const double medbayRecoveryBonusPerLevel = 0.25;
+  static const int intensiveCareBaseCost = 50;
+  static const int intensiveCareCostPerRecoveryDay = 10;
+
   // --- Rank / XP progression --------------------------------------------
   /// Cumulative XP required to be at rank index N (index 0 == rank 1, the
   /// starting rank at which a soldier picks their specialization).

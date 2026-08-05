@@ -1,6 +1,8 @@
 import 'dart:math';
 
+import 'package:blackwire_protocol/core/constants.dart';
 import 'package:blackwire_protocol/data/content/equipment_catalog.dart';
+import 'package:blackwire_protocol/data/models/base_state.dart';
 import 'package:blackwire_protocol/data/models/faction.dart';
 import 'package:blackwire_protocol/data/models/mission_site.dart';
 import 'package:blackwire_protocol/data/models/soldier.dart';
@@ -279,6 +281,80 @@ void main() {
         container.read(gameStateProvider).resources.credits,
         lessThan(10000),
       );
+    });
+
+    test('medbay upgrade is persisted and legacy saves default to level 1', () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final notifier = container.read(gameStateProvider.notifier);
+      final save = container.read(gameStateProvider);
+      notifier.loadSave(
+        save.copyWith(
+          resources: save.resources.copyWith(credits: 10000, materials: 1000),
+        ),
+      );
+
+      expect(BaseState.fromJson(const {}).medbayLevel, 1);
+      expect(notifier.upgradeFacility('medbay'), isTrue);
+      final medbay = container.read(gameStateProvider).base;
+      expect(medbay.medbayLevel, 2);
+      expect(medbay.recoverySpeedMultiplier, 1.25);
+      expect(BaseState.fromJson(medbay.toJson()).medbayLevel, 2);
+    });
+
+    test('medbay level speeds up passive wound recovery', () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final notifier = container.read(gameStateProvider.notifier);
+      final save = container.read(gameStateProvider);
+      const wounded = Soldier(
+        id: 'wounded',
+        name: 'Patient',
+        currentHp: 40,
+        status: SoldierStatus.wounded,
+        recoveryDaysLeft: 4,
+      );
+      notifier.loadSave(
+        save.copyWith(
+          base: save.base.copyWith(medbayLevel: 3),
+          soldiers: [wounded],
+        ),
+      );
+
+      notifier.tick(GameConfig.secondsPerGameDay);
+
+      final updated = container.read(gameStateProvider).soldiers.single;
+      expect(updated.status, SoldierStatus.wounded);
+      expect(updated.recoveryDaysLeft, closeTo(2.5, 0.001));
+    });
+
+    test('intensive care spends credits and can return a soldier to duty', () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final notifier = container.read(gameStateProvider.notifier);
+      final save = container.read(gameStateProvider);
+      const wounded = Soldier(
+        id: 'wounded',
+        name: 'Patient',
+        currentHp: 40,
+        status: SoldierStatus.wounded,
+        recoveryDaysLeft: 2,
+      );
+      notifier.loadSave(
+        save.copyWith(
+          soldiers: [wounded],
+          resources: save.resources.copyWith(credits: 500),
+        ),
+      );
+
+      expect(notifier.intensiveCareCost(wounded), 70);
+      expect(notifier.provideIntensiveCare(wounded.id), isTrue);
+
+      final updatedSave = container.read(gameStateProvider);
+      expect(updatedSave.resources.credits, 430);
+      expect(updatedSave.soldiers.single.status, SoldierStatus.active);
+      expect(updatedSave.soldiers.single.currentHp, wounded.maxHp);
+      expect(updatedSave.soldiers.single.recoveryDaysLeft, 0);
     });
 
     test('completeResearch respects prerequisites and cost', () {

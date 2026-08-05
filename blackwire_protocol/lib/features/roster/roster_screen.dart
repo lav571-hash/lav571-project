@@ -162,7 +162,7 @@ class _SoldierCard extends ConsumerWidget {
     };
     final statusLabel = switch (soldier.status) {
       SoldierStatus.active => 'Готов',
-      SoldierStatus.wounded => 'Ранен · ${soldier.recoveryDaysLeft} дн.',
+      SoldierStatus.wounded => 'Ранен · ${soldier.recoveryDaysLeft.ceil()} дн.',
       SoldierStatus.dead => 'Погиб',
     };
 

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/constants.dart';
 import '../../data/content/equipment_catalog.dart';
+import '../../data/models/soldier.dart';
 import '../../state/game_state_notifier.dart';
 
 class BaseScreen extends ConsumerWidget {
@@ -10,6 +11,7 @@ class BaseScreen extends ConsumerWidget {
 
   static const _facilities = [
     ('barracks', 'Казармы', Icons.bed, 'Вместимость отряда'),
+    ('medbay', 'Медотсек', Icons.local_hospital, 'Восстановление раненых'),
     (
       'workshop',
       'Мастерская',
@@ -44,6 +46,8 @@ class BaseScreen extends ConsumerWidget {
               '${save.soldiers.length}/${save.base.rosterCapacity} бойцов',
             'hangar' => '${save.base.parallelMissionSlots} слот(ов) миссий',
             'warehouse' => 'лимит ${save.base.resourceStorageCap}',
+            'medbay' =>
+              '×${save.base.recoverySpeedMultiplier.toStringAsFixed(2)} · интенсивная терапия −${save.base.intensiveCareDays.toStringAsFixed(0)} дн.',
             _ => 'ур. $level',
           };
 
@@ -108,6 +112,54 @@ class BaseScreen extends ConsumerWidget {
                     ],
                   ),
                 ],
+              ),
+            ),
+          );
+        }),
+        const SizedBox(height: 16),
+        const _SectionTitle('МЕДОТСЕК: РАНЕНЫЕ'),
+        const SizedBox(height: 8),
+        if (!save.soldiers.any((s) => s.status == SoldierStatus.wounded))
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: Text(
+              'Все оперативники готовы к бою.',
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
+          ),
+        ...save.soldiers.where((s) => s.status == SoldierStatus.wounded).map((
+          soldier,
+        ) {
+          final cost = notifier.intensiveCareCost(soldier);
+          final affordable = save.resources.credits >= cost;
+          return Card(
+            color: AppColors.surfaceAlt,
+            margin: const EdgeInsets.only(bottom: 8),
+            child: ListTile(
+              leading: const Icon(
+                Icons.monitor_heart,
+                color: AppColors.neonYellow,
+              ),
+              title: Text(
+                soldier.name,
+                style: const TextStyle(color: AppColors.textPrimary),
+              ),
+              subtitle: Text(
+                'HP ${soldier.currentHp}/${soldier.maxHp} · ${soldier.recoveryDaysLeft.ceil()} дн. до восстановления',
+                style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 12,
+                ),
+              ),
+              trailing: ElevatedButton(
+                onPressed: affordable
+                    ? () => notifier.provideIntensiveCare(soldier.id)
+                    : null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.neonGreen,
+                  foregroundColor: Colors.black,
+                ),
+                child: Text('Лечить (₡$cost)'),
               ),
             ),
           );

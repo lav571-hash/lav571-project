@@ -27,7 +27,7 @@ class Soldier {
   final String? armorId;
   final List<String> abilityIds;
   final SoldierStatus status;
-  final int recoveryDaysLeft;
+  final double recoveryDaysLeft;
   final int missionsSurvived;
 
   final int rank;
@@ -156,7 +156,7 @@ class Soldier {
     String? armorId,
     List<String>? abilityIds,
     SoldierStatus? status,
-    int? recoveryDaysLeft,
+    double? recoveryDaysLeft,
     int? missionsSurvived,
     int? rank,
     int? xp,
@@ -228,7 +228,7 @@ class Soldier {
       (e) => e.name == json['status'],
       orElse: () => SoldierStatus.active,
     ),
-    recoveryDaysLeft: json['recoveryDaysLeft'] as int? ?? 0,
+    recoveryDaysLeft: (json['recoveryDaysLeft'] as num?)?.toDouble() ?? 0,
     missionsSurvived: json['missionsSurvived'] as int? ?? 0,
     rank: json['rank'] as int? ?? 0,
     xp: json['xp'] as int? ?? 0,

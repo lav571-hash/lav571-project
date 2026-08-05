@@ -29,6 +29,7 @@ class FacilityCosts {
     'lab': 250,
     'hangar': 300,
     'warehouse': 180,
+    'medbay': 220,
   };
   static const Map<String, int> materialCostPerLevel = {
     'barracks': 20,
@@ -36,6 +37,7 @@ class FacilityCosts {
     'lab': 25,
     'hangar': 35,
     'warehouse': 15,
+    'medbay': 20,
   };
 
   static int creditsFor(String facilityId, int nextLevel) =>
@@ -138,7 +140,10 @@ class GameStateNotifier extends Notifier<GameSave> {
     }
 
     // Soldier recovery.
-    final daysPassed = dtSeconds / GameConfig.secondsPerGameDay;
+    final daysPassed =
+        dtSeconds /
+        GameConfig.secondsPerGameDay *
+        state.base.recoverySpeedMultiplier;
     final updatedSoldiers = state.soldiers.map((s) {
       if (s.status == SoldierStatus.wounded) {
         final remaining = s.recoveryDaysLeft - daysPassed;
@@ -149,9 +154,7 @@ class GameStateNotifier extends Notifier<GameSave> {
             currentHp: s.maxHp,
           );
         }
-        return s.copyWith(
-          recoveryDaysLeft: remaining.ceil().toDouble().toInt(),
-        );
+        return s.copyWith(recoveryDaysLeft: remaining);
       }
       return s;
     }).toList();
@@ -292,10 +295,12 @@ class GameStateNotifier extends Notifier<GameSave> {
     'lab' => state.base.labLevel,
     'hangar' => state.base.hangarLevel,
     'warehouse' => state.base.warehouseLevel,
+    'medbay' => state.base.medbayLevel,
     _ => 1,
   };
 
   bool upgradeFacility(String facilityId) {
+    if (!FacilityCosts.creditCostPerLevel.containsKey(facilityId)) return false;
     final nextLevel = currentLevel(facilityId) + 1;
     final creditCost = FacilityCosts.creditsFor(facilityId, nextLevel);
     final materialCost = FacilityCosts.materialsFor(facilityId, nextLevel);
@@ -309,6 +314,7 @@ class GameStateNotifier extends Notifier<GameSave> {
       'lab' => state.base.copyWith(labLevel: nextLevel),
       'hangar' => state.base.copyWith(hangarLevel: nextLevel),
       'warehouse' => state.base.copyWith(warehouseLevel: nextLevel),
+      'medbay' => state.base.copyWith(medbayLevel: nextLevel),
       _ => state.base,
     };
     state = state.copyWith(
@@ -316,6 +322,39 @@ class GameStateNotifier extends Notifier<GameSave> {
       resources: state.resources.copyWith(
         credits: state.resources.credits - creditCost,
         materials: state.resources.materials - materialCost,
+      ),
+    );
+    unawaited(_persist());
+    return true;
+  }
+
+  int intensiveCareCost(Soldier soldier) =>
+      GameConfig.intensiveCareBaseCost +
+      soldier.recoveryDaysLeft.ceil() *
+          GameConfig.intensiveCareCostPerRecoveryDay;
+
+  bool provideIntensiveCare(String soldierId) {
+    final soldiers = [...state.soldiers];
+    final index = soldiers.indexWhere((s) => s.id == soldierId);
+    if (index == -1) return false;
+
+    final soldier = soldiers[index];
+    if (soldier.status != SoldierStatus.wounded) return false;
+    final cost = intensiveCareCost(soldier);
+    if (state.resources.credits < cost) return false;
+
+    final remaining = soldier.recoveryDaysLeft - state.base.intensiveCareDays;
+    soldiers[index] = remaining <= 0
+        ? soldier.copyWith(
+            status: SoldierStatus.active,
+            currentHp: soldier.maxHp,
+            recoveryDaysLeft: 0,
+          )
+        : soldier.copyWith(recoveryDaysLeft: remaining);
+    state = state.copyWith(
+      soldiers: soldiers,
+      resources: state.resources.copyWith(
+        credits: state.resources.credits - cost,
       ),
     );
     unawaited(_persist());
@@ -463,7 +502,7 @@ class GameStateNotifier extends Notifier<GameSave> {
         soldier = soldier.copyWith(
           status: SoldierStatus.wounded,
           currentHp: unit.currentHp,
-          recoveryDaysLeft: recoveryDays,
+          recoveryDaysLeft: recoveryDays.toDouble(),
         );
       } else {
         soldier = soldier.copyWith(currentHp: soldier.maxHp);
