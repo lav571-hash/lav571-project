@@ -51,7 +51,8 @@ class BaseScreen extends ConsumerWidget {
           String statValue = switch (id) {
             'barracks' =>
               '${save.soldiers.length}/${save.base.rosterCapacity} бойцов',
-            'hangar' => '${save.base.parallelMissionSlots} слот(ов) миссий',
+            'hangar' =>
+              '${notifier.inProgressMissionCount}/${save.base.parallelMissionSlots} слот(ов) занято',
             'warehouse' => 'лимит ${save.base.resourceStorageCap}',
             'medbay' =>
               '×${save.base.recoverySpeedMultiplier.toStringAsFixed(2)} · интенсивная терапия −${save.base.intensiveCareDays.toStringAsFixed(0)} дн.',

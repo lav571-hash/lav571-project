@@ -38,6 +38,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
         .read(gameStateProvider.notifier)
         .soldiersWithPendingPromotion
         .length;
+    final pendingReports = save.operationReports.length;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -61,8 +62,13 @@ class _HomeShellState extends ConsumerState<HomeShell> {
             icon: Icon(Icons.apartment),
             label: 'База',
           ),
-          const NavigationDestination(
-            icon: Icon(Icons.public),
+          NavigationDestination(
+            icon: pendingReports > 0
+                ? Badge(
+                    label: Text('$pendingReports'),
+                    child: const Icon(Icons.public),
+                  )
+                : const Icon(Icons.public),
             label: 'Геоскейп',
           ),
           NavigationDestination(

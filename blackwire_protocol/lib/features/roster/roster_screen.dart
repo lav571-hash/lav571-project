@@ -154,17 +154,23 @@ class _SoldierCard extends ConsumerWidget {
     final armor = soldier.armorId != null
         ? kArmorCatalog[soldier.armorId]
         : null;
+    final deployed = notifier.deployedSoldierIds.contains(soldier.id);
 
-    final statusColor = switch (soldier.status) {
-      SoldierStatus.active => AppColors.neonGreen,
-      SoldierStatus.wounded => AppColors.neonYellow,
-      SoldierStatus.dead => AppColors.danger,
-    };
-    final statusLabel = switch (soldier.status) {
-      SoldierStatus.active => 'Готов',
-      SoldierStatus.wounded => 'Ранен · ${soldier.recoveryDaysLeft.ceil()} дн.',
-      SoldierStatus.dead => 'Погиб',
-    };
+    final statusColor = deployed
+        ? AppColors.neonCyan
+        : switch (soldier.status) {
+            SoldierStatus.active => AppColors.neonGreen,
+            SoldierStatus.wounded => AppColors.neonYellow,
+            SoldierStatus.dead => AppColors.danger,
+          };
+    final statusLabel = deployed
+        ? 'На операции'
+        : switch (soldier.status) {
+            SoldierStatus.active => 'Готов',
+            SoldierStatus.wounded =>
+              'Ранен · ${soldier.recoveryDaysLeft.ceil()} дн.',
+            SoldierStatus.dead => 'Погиб',
+          };
 
     final availableWeapons = [
       'pistol_mk1',
@@ -255,7 +261,7 @@ class _SoldierCard extends ConsumerWidget {
                   value: soldier.weaponId,
                   items: availableWeapons,
                   labelBuilder: (id) => kWeaponCatalog[id]!.name,
-                  onChanged: soldier.status == SoldierStatus.dead
+                  onChanged: soldier.status == SoldierStatus.dead || deployed
                       ? null
                       : (id) => notifier.equipSoldier(soldier.id, weaponId: id),
                 ),
@@ -265,7 +271,7 @@ class _SoldierCard extends ConsumerWidget {
                     value: soldier.armorId,
                     items: availableArmors,
                     labelBuilder: (id) => kArmorCatalog[id]!.name,
-                    onChanged: soldier.status == SoldierStatus.dead
+                    onChanged: soldier.status == SoldierStatus.dead || deployed
                         ? null
                         : (id) =>
                               notifier.equipSoldier(soldier.id, armorId: id),

@@ -1,5 +1,6 @@
 import '../../core/constants.dart';
 import 'base_state.dart';
+import 'deployed_operation.dart';
 import 'faction.dart';
 import 'mission_site.dart';
 import 'resources.dart';
@@ -20,6 +21,8 @@ class GameSave {
   final List<FactionThreat> factionThreats;
   final double chaosLevel;
   final List<MissionSite> activeMissions;
+  final List<DeployedOperation> deployedOperations;
+  final List<OperationReport> operationReports;
   final double elapsedGameSeconds;
   final bool gameOver;
   final bool victory;
@@ -39,6 +42,8 @@ class GameSave {
     required this.chaosLevel,
     required this.activeMissions,
     required this.elapsedGameSeconds,
+    this.deployedOperations = const [],
+    this.operationReports = const [],
     this.gameOver = false,
     this.victory = false,
   });
@@ -79,6 +84,8 @@ class GameSave {
     List<FactionThreat>? factionThreats,
     double? chaosLevel,
     List<MissionSite>? activeMissions,
+    List<DeployedOperation>? deployedOperations,
+    List<OperationReport>? operationReports,
     double? elapsedGameSeconds,
     bool? gameOver,
     bool? victory,
@@ -97,6 +104,8 @@ class GameSave {
       factionThreats: factionThreats ?? this.factionThreats,
       chaosLevel: chaosLevel ?? this.chaosLevel,
       activeMissions: activeMissions ?? this.activeMissions,
+      deployedOperations: deployedOperations ?? this.deployedOperations,
+      operationReports: operationReports ?? this.operationReports,
       elapsedGameSeconds: elapsedGameSeconds ?? this.elapsedGameSeconds,
       gameOver: gameOver ?? this.gameOver,
       victory: victory ?? this.victory,
@@ -117,6 +126,8 @@ class GameSave {
     'factionThreats': factionThreats.map((f) => f.toJson()).toList(),
     'chaosLevel': chaosLevel,
     'activeMissions': activeMissions.map((m) => m.toJson()).toList(),
+    'deployedOperations': deployedOperations.map((o) => o.toJson()).toList(),
+    'operationReports': operationReports.map((r) => r.toJson()).toList(),
     'elapsedGameSeconds': elapsedGameSeconds,
     'gameOver': gameOver,
     'victory': victory,
@@ -150,6 +161,16 @@ class GameSave {
     activeMissions: (json['activeMissions'] as List)
         .map((m) => MissionSite.fromJson(m as Map<String, dynamic>))
         .toList(),
+    deployedOperations:
+        (json['deployedOperations'] as List?)
+            ?.map((o) => DeployedOperation.fromJson(o as Map<String, dynamic>))
+            .toList() ??
+        const [],
+    operationReports:
+        (json['operationReports'] as List?)
+            ?.map((r) => OperationReport.fromJson(r as Map<String, dynamic>))
+            .toList() ??
+        const [],
     elapsedGameSeconds: (json['elapsedGameSeconds'] as num).toDouble(),
     gameOver: json['gameOver'] as bool? ?? false,
     victory: json['victory'] as bool? ?? false,

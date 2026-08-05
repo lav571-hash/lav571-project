@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/constants.dart';
+import '../../data/models/deployed_operation.dart';
 import '../../data/models/faction.dart';
 import '../../data/models/mission_result.dart';
 import '../../data/models/mission_site.dart';
@@ -37,19 +38,30 @@ class _GeoscapeScreenState extends ConsumerState<GeoscapeScreen> {
 
   Future<void> _openMissionSheet(MissionSite mission) async {
     final save = ref.read(gameStateProvider);
-    final available = save.soldiers
-        .where((s) => s.status == SoldierStatus.active)
-        .toList();
-    final selected = await showModalBottomSheet<List<String>>(
+    final notifier = ref.read(gameStateProvider.notifier);
+    final available = save.soldiers.where(notifier.isSoldierAvailable).toList();
+    final selected = await showModalBottomSheet<_MissionLaunchChoice>(
       context: context,
       backgroundColor: AppColors.surface,
       isScrollControlled: true,
-      builder: (context) =>
-          _MissionSheet(mission: mission, availableSoldiers: available),
+      builder: (context) => _MissionSheet(
+        mission: mission,
+        availableSoldiers: available,
+        canAutoDeploy: notifier.canLaunchMission(),
+      ),
     );
-    if (selected == null || selected.isEmpty) return;
+    if (selected == null || selected.soldierIds.isEmpty) return;
     if (!mounted) return;
-    await _launchMission(mission, selected);
+    if (selected.autoDeploy) {
+      final deployed = notifier.deployMission(mission, selected.soldierIds);
+      if (mounted && !deployed) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Не удалось отправить операцию.')),
+        );
+      }
+      return;
+    }
+    await _launchMission(mission, selected.soldierIds);
   }
 
   Future<void> _launchMission(
@@ -164,6 +176,15 @@ class _GeoscapeScreenState extends ConsumerState<GeoscapeScreen> {
                 label: '4x',
               ),
             ],
+          ),
+        ),
+        SizedBox(
+          height: 112,
+          child: _OperationsPanel(
+            operations: save.deployedOperations,
+            reports: save.operationReports,
+            usedSlots: save.deployedOperations.length,
+            totalSlots: save.base.parallelMissionSlots,
           ),
         ),
         Expanded(
@@ -302,6 +323,162 @@ class _GeoscapeScreenState extends ConsumerState<GeoscapeScreen> {
   }
 }
 
+class _OperationsPanel extends ConsumerWidget {
+  final List<DeployedOperation> operations;
+  final List<OperationReport> reports;
+  final int usedSlots;
+  final int totalSlots;
+
+  const _OperationsPanel({
+    required this.operations,
+    required this.reports,
+    required this.usedSlots,
+    required this.totalSlots,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final items = <Widget>[
+      ...operations.map((operation) {
+        final progress =
+            1 - operation.secondsRemaining / operation.totalDurationSeconds;
+        final faction = kFactionDefs[operation.mission.factionId]!;
+        return Container(
+          width: 250,
+          margin: const EdgeInsets.only(right: 8),
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: faction.color),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${operation.mission.regionName} · ${operation.soldierIds.length} бойц.',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Text(
+                '${faction.name} · ${operation.secondsRemaining.ceil()}с',
+                style: TextStyle(color: faction.color, fontSize: 10),
+              ),
+              const SizedBox(height: 4),
+              LinearProgressIndicator(
+                value: progress.clamp(0, 1),
+                minHeight: 5,
+                color: AppColors.neonCyan,
+                backgroundColor: Colors.black45,
+              ),
+            ],
+          ),
+        );
+      }),
+      ...reports.map((report) {
+        final color = report.victory ? AppColors.neonGreen : AppColors.danger;
+        return Container(
+          width: 270,
+          margin: const EdgeInsets.only(right: 8),
+          padding: const EdgeInsets.fromLTRB(8, 6, 4, 6),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: color),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                report.victory ? Icons.check_circle : Icons.cancel,
+                color: color,
+                size: 20,
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      report.victory
+                          ? 'ОПЕРАЦИЯ УСПЕШНА'
+                          : 'ОПЕРАЦИЯ ПРОВАЛЕНА',
+                      style: TextStyle(
+                        color: color,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      '${report.regionName} · ₡${report.loot.credits} ◆${report.loot.data}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 10,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                visualDensity: VisualDensity.compact,
+                tooltip: 'Закрыть отчёт',
+                onPressed: () => ref
+                    .read(gameStateProvider.notifier)
+                    .dismissOperationReport(report.id),
+                icon: const Icon(
+                  Icons.close,
+                  color: AppColors.textSecondary,
+                  size: 16,
+                ),
+              ),
+            ],
+          ),
+        );
+      }),
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 4, 14, 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'АНГАР: ОПЕРАЦИИ $usedSlots/$totalSlots',
+            style: const TextStyle(
+              color: AppColors.neonCyan,
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Expanded(
+            child: items.isEmpty
+                ? const Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Нет активных операций. Выберите миссию и отправьте отряд.',
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 11,
+                      ),
+                    ),
+                  )
+                : ListView(scrollDirection: Axis.horizontal, children: items),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _GeoMap extends StatelessWidget {
   final List<MissionSite> missions;
   final void Function(MissionSite) onTapMission;
@@ -398,11 +575,26 @@ class _GridPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
+class _MissionLaunchChoice {
+  final List<String> soldierIds;
+  final bool autoDeploy;
+
+  const _MissionLaunchChoice({
+    required this.soldierIds,
+    required this.autoDeploy,
+  });
+}
+
 class _MissionSheet extends StatefulWidget {
   final MissionSite mission;
   final List<Soldier> availableSoldiers;
+  final bool canAutoDeploy;
 
-  const _MissionSheet({required this.mission, required this.availableSoldiers});
+  const _MissionSheet({
+    required this.mission,
+    required this.availableSoldiers,
+    required this.canAutoDeploy,
+  });
 
   @override
   State<_MissionSheet> createState() => _MissionSheetState();
@@ -492,14 +684,40 @@ class _MissionSheetState extends State<_MissionSheet> {
             child: ElevatedButton(
               onPressed: _selected.isEmpty
                   ? null
-                  : () => Navigator.of(context).pop(_selected.toList()),
+                  : () => Navigator.of(context).pop(
+                      _MissionLaunchChoice(
+                        soldierIds: _selected.toList(),
+                        autoDeploy: false,
+                      ),
+                    ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.neonMagenta,
-                padding: const EdgeInsets.symmetric(vertical: 14),
+                padding: const EdgeInsets.symmetric(vertical: 12),
               ),
               child: const Text(
-                'НАЧАТЬ МИССИЮ',
+                'ВОЗГЛАВИТЬ МИССИЮ',
                 style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: _selected.isEmpty || !widget.canAutoDeploy
+                  ? null
+                  : () => Navigator.of(context).pop(
+                      _MissionLaunchChoice(
+                        soldierIds: _selected.toList(),
+                        autoDeploy: true,
+                      ),
+                    ),
+              icon: const Icon(Icons.flight_takeoff, size: 18),
+              label: Text(
+                widget.canAutoDeploy
+                    ? 'ОТПРАВИТЬ ЧЕРЕЗ АНГАР'
+                    : 'НЕТ СВОБОДНЫХ СЛОТОВ АНГАРА',
+                style: const TextStyle(fontWeight: FontWeight.bold),
               ),
             ),
           ),

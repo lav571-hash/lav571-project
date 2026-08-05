@@ -44,6 +44,9 @@ class GameConfig {
   static const double meanSecondsBetweenMissions = 26.0;
   static const int maxActiveMissions = 5;
   static const int maxSquadSize = 4;
+  static const double autoOperationBaseSeconds = 35;
+  static const double autoOperationSecondsPerDifficulty = 10;
+  static const int maxOperationReports = 10;
 
   // --- Medbay ------------------------------------------------------------
   static const double medbayRecoveryBonusPerLevel = 0.25;

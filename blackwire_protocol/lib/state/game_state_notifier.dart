@@ -7,6 +7,7 @@ import '../core/constants.dart';
 import '../data/content/equipment_catalog.dart';
 import '../data/content/research_catalog.dart';
 import '../data/content/skill_catalog.dart';
+import '../data/models/deployed_operation.dart';
 import '../data/models/faction.dart';
 import '../data/models/game_save.dart';
 import '../data/models/mission_result.dart';
@@ -17,6 +18,7 @@ import '../data/models/skill.dart';
 import '../data/models/soldier.dart';
 import '../data/models/specialization.dart';
 import '../data/repositories/save_repository.dart';
+import '../game/auto_operation_resolver.dart';
 import '../game/battle_controller.dart';
 import '../game/battle_factory.dart';
 import '../game/geoscape/mission_generator.dart';
@@ -141,6 +143,19 @@ class GameStateNotifier extends Notifier<GameSave> {
       missions.add(MissionGenerator.generate(_random));
     }
 
+    final completedOperations = <DeployedOperation>[];
+    final deployedOperations = state.deployedOperations
+        .map((operation) {
+          final remaining = operation.secondsRemaining - dtSeconds;
+          if (remaining <= 0) {
+            completedOperations.add(operation);
+            return null;
+          }
+          return operation.copyWith(secondsRemaining: remaining);
+        })
+        .whereType<DeployedOperation>()
+        .toList();
+
     // Soldier recovery.
     final daysPassed =
         dtSeconds /
@@ -169,11 +184,16 @@ class GameStateNotifier extends Notifier<GameSave> {
       activeMissions: missions,
       elapsedGameSeconds: newElapsed,
       soldiers: updatedSoldiers,
+      deployedOperations: deployedOperations,
       gameOver: gameOver,
       victory: false,
     );
 
-    if (gameOver) {
+    for (final operation in completedOperations) {
+      _completeDeployedOperation(operation);
+    }
+
+    if (state.gameOver) {
       _ticker?.cancel();
     }
 
@@ -207,6 +227,7 @@ class GameStateNotifier extends Notifier<GameSave> {
     final index = soldiers.indexWhere((s) => s.id == soldierId);
     if (index == -1) return;
     final soldier = soldiers[index];
+    if (deployedSoldierIds.contains(soldier.id)) return;
 
     final weaponStock = Map<String, int>.from(state.weaponStock);
     final armorStock = Map<String, int>.from(state.armorStock);
@@ -490,11 +511,173 @@ class GameStateNotifier extends Notifier<GameSave> {
   // Missions
   // ---------------------------------------------------------------------
 
-  int get inProgressMissionCount =>
-      0; // MVP resolves missions synchronously, never left "in flight".
+  Set<String> get deployedSoldierIds => state.deployedOperations
+      .expand((operation) => operation.soldierIds)
+      .toSet();
+
+  bool isSoldierAvailable(Soldier soldier) =>
+      soldier.isAvailable && !deployedSoldierIds.contains(soldier.id);
+
+  int get inProgressMissionCount => state.deployedOperations.length;
 
   bool canLaunchMission() =>
       inProgressMissionCount < state.base.parallelMissionSlots;
+
+  double operationDurationFor(MissionSite mission) =>
+      GameConfig.autoOperationBaseSeconds +
+      mission.difficulty * GameConfig.autoOperationSecondsPerDifficulty;
+
+  bool deployMission(MissionSite mission, List<String> soldierIds) {
+    final uniqueIds = soldierIds.toSet();
+    final missionExists = state.activeMissions.any((m) => m.id == mission.id);
+    final selectedSoldiers = state.soldiers
+        .where((s) => uniqueIds.contains(s.id))
+        .toList();
+    if (!canLaunchMission() ||
+        !missionExists ||
+        uniqueIds.isEmpty ||
+        uniqueIds.length > GameConfig.maxSquadSize ||
+        selectedSoldiers.length != uniqueIds.length ||
+        selectedSoldiers.any((s) => !isSoldierAvailable(s))) {
+      return false;
+    }
+
+    final duration = operationDurationFor(mission);
+    final operation = DeployedOperation(
+      id: 'op_${mission.id}',
+      mission: mission,
+      soldierIds: uniqueIds.toList(),
+      secondsRemaining: duration,
+      totalDurationSeconds: duration,
+      randomSeed: _random.nextInt(1 << 31),
+    );
+    state = state.copyWith(
+      activeMissions: state.activeMissions
+          .where((m) => m.id != mission.id)
+          .toList(),
+      deployedOperations: [...state.deployedOperations, operation],
+    );
+    unawaited(_persist());
+    return true;
+  }
+
+  void dismissOperationReport(String reportId) {
+    state = state.copyWith(
+      operationReports: state.operationReports
+          .where((report) => report.id != reportId)
+          .toList(),
+    );
+    unawaited(_persist());
+  }
+
+  void _completeDeployedOperation(DeployedOperation operation) {
+    final squad = state.soldiers
+        .where((s) => operation.soldierIds.contains(s.id))
+        .toList();
+    final outcome = AutoOperationResolver.resolve(operation, squad);
+    final wounded = <String>[];
+    final killed = <String>[];
+    final updatedSoldiers = <Soldier>[];
+
+    for (final soldier in state.soldiers) {
+      if (!operation.soldierIds.contains(soldier.id)) {
+        updatedSoldiers.add(soldier);
+        continue;
+      }
+
+      final soldierOutcome =
+          outcome.soldierOutcomes[soldier.id] ?? AutoSoldierOutcome.ready;
+      if (soldierOutcome == AutoSoldierOutcome.killed) {
+        killed.add(soldier.name);
+        continue;
+      }
+
+      var updated = soldier.copyWith(
+        missionsSurvived: soldier.missionsSurvived + 1,
+      );
+      if (soldierOutcome == AutoSoldierOutcome.wounded) {
+        wounded.add(soldier.name);
+        final improvedMaxHp = updated.maxHp + GameConfig.hpGainPerWound;
+        updated = updated.copyWith(
+          maxHp: improvedMaxHp,
+          currentHp: (improvedMaxHp * 0.35).round(),
+          status: SoldierStatus.wounded,
+          recoveryDaysLeft: (2 + operation.mission.difficulty).toDouble(),
+        );
+      } else {
+        updated = updated.copyWith(currentHp: updated.maxHp);
+      }
+      updated = SoldierProgression.applyXpAndRankUp(
+        updated,
+        GameConfig.xpPerMissionParticipation + (outcome.victory ? 5 : 0),
+      );
+      updatedSoldiers.add(updated);
+    }
+
+    var loot = const Resources();
+    var trophiesRecovered = 0;
+    var threats = state.factionThreats;
+    var chaos = state.chaosLevel;
+    final trophies = Map<String, int>.from(state.intelTrophies);
+    if (outcome.victory) {
+      loot = Resources(
+        credits: 60 + operation.mission.difficulty * 40,
+        materials: 8 + operation.mission.difficulty * 4,
+        data: 6 + operation.mission.difficulty * 3,
+      );
+      trophiesRecovered = 1 + operation.mission.difficulty ~/ 3;
+      trophies[operation.mission.factionId.name] =
+          (trophies[operation.mission.factionId.name] ?? 0) + trophiesRecovered;
+      threats = threats
+          .map(
+            (f) => f.factionId == operation.mission.factionId
+                ? f.copyWith(
+                    threatLevel:
+                        (f.threatLevel -
+                                (12 + operation.mission.difficulty * 3))
+                            .clamp(0, 100),
+                  )
+                : f,
+          )
+          .toList();
+      chaos = (chaos - 2).clamp(0, 100).toDouble();
+    } else {
+      threats = threats
+          .map(
+            (f) => f.factionId == operation.mission.factionId
+                ? f.copyWith(threatLevel: (f.threatLevel + 8).clamp(0, 100))
+                : f,
+          )
+          .toList();
+      chaos = (chaos + 4).clamp(0, 100).toDouble();
+    }
+
+    final report = OperationReport(
+      id: operation.id,
+      regionName: operation.mission.regionName,
+      factionName: kFactionDefs[operation.mission.factionId]!.name,
+      victory: outcome.victory,
+      loot: loot,
+      trophiesRecovered: trophiesRecovered,
+      wounded: wounded,
+      killedInAction: killed,
+    );
+    final reports = [...state.operationReports, report];
+    final retainedReports = reports.length > GameConfig.maxOperationReports
+        ? reports.sublist(reports.length - GameConfig.maxOperationReports)
+        : reports;
+    state = state.copyWith(
+      soldiers: updatedSoldiers,
+      resources: (state.resources + loot).clampedTo(
+        state.base.resourceStorageCap,
+      ),
+      intelTrophies: trophies,
+      factionThreats: threats,
+      chaosLevel: chaos,
+      operationReports: retainedReports,
+    );
+    unawaited(_persist());
+  }
 
   BattleController launchMission(MissionSite mission, List<String> soldierIds) {
     final squad = state.soldiers
