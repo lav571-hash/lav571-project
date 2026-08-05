@@ -30,7 +30,7 @@ class BaseState {
   int get resourceStorageCap => 100 + (warehouseLevel - 1) * 100;
   double get recoverySpeedMultiplier =>
       1 + (medbayLevel - 1) * GameConfig.medbayRecoveryBonusPerLevel;
-  double get intensiveCareDays => 1 + medbayLevel;
+  double get intensiveCareDays => 1.0 + medbayLevel;
 
   BaseState copyWith({
     int? barracksLevel,

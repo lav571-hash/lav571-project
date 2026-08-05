@@ -44,10 +44,14 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Медотсек · ур.1'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Patient Zero'),
+      300,
+      scrollable: find.byType(Scrollable),
+    );
     expect(find.text('Patient Zero'), findsOneWidget);
     expect(find.text('Лечить (₡70)'), findsOneWidget);
 
-    await tester.ensureVisible(find.text('Лечить (₡70)'));
     await tester.tap(find.text('Лечить (₡70)'));
     await tester.pumpAndSettle();
 
