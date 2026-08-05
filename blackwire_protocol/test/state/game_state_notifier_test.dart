@@ -4,6 +4,7 @@ import 'package:blackwire_protocol/core/constants.dart';
 import 'package:blackwire_protocol/data/content/equipment_catalog.dart';
 import 'package:blackwire_protocol/data/models/base_state.dart';
 import 'package:blackwire_protocol/data/models/faction.dart';
+import 'package:blackwire_protocol/data/models/game_save.dart';
 import 'package:blackwire_protocol/data/models/mission_site.dart';
 import 'package:blackwire_protocol/data/models/soldier.dart';
 import 'package:blackwire_protocol/data/models/specialization.dart';
@@ -139,6 +140,7 @@ void main() {
 
         expect(missionResult.victory, isTrue);
         expect(missionResult.loot.credits, greaterThan(0));
+        expect(missionResult.trophiesRecovered, 1);
         expect(missionResult.killedInAction, contains(dead.name));
         expect(missionResult.wounded, contains(wounded.name));
 
@@ -172,6 +174,7 @@ void main() {
 
         // Loot applied to resources.
         expect(save.resources.credits, greaterThan(500));
+        expect(save.intelTrophies[EnemyFactionId.nexusRobotics.name], 1);
 
         // Faction threat for the targeted faction decreased; mission removed.
         final threat = save.factionThreats.firstWhere(
@@ -244,6 +247,7 @@ void main() {
 
       expect(missionResult.victory, isFalse);
       expect(missionResult.loot.credits, 0);
+      expect(missionResult.trophiesRecovered, 0);
       expect(missionResult.killedInAction.length, 2);
 
       final save = container.read(gameStateProvider);
@@ -254,6 +258,7 @@ void main() {
       expect(save.chaosLevel, greaterThan(chaosBefore));
       expect(save.soldiers.any((s) => s.id == squad[0].id), isFalse);
       expect(save.soldiers.any((s) => s.id == squad[1].id), isFalse);
+      expect(save.intelTrophies, isEmpty);
     });
   });
 
@@ -300,6 +305,17 @@ void main() {
       expect(medbay.medbayLevel, 2);
       expect(medbay.recoverySpeedMultiplier, 1.25);
       expect(BaseState.fromJson(medbay.toJson()).medbayLevel, 2);
+    });
+
+    test('legacy saves default intel center and trophy storage safely', () {
+      final json = GameSave.newGame().toJson();
+      (json['base'] as Map<String, dynamic>).remove('intelCenterLevel');
+      json.remove('intelTrophies');
+
+      final restored = GameSave.fromJson(json);
+
+      expect(restored.base.intelCenterLevel, 1);
+      expect(restored.intelTrophies, isEmpty);
     });
 
     test('medbay level speeds up passive wound recovery', () {
@@ -355,6 +371,58 @@ void main() {
       expect(updatedSave.soldiers.single.status, SoldierStatus.active);
       expect(updatedSave.soldiers.single.currentHp, wounded.maxHp);
       expect(updatedSave.soldiers.single.recoveryDaysLeft, 0);
+    });
+
+    test(
+      'intel center converts one faction trophy into facility-scaled data',
+      () {
+        final container = ProviderContainer();
+        addTearDown(container.dispose);
+        final notifier = container.read(gameStateProvider.notifier);
+        final save = container.read(gameStateProvider);
+        notifier.loadSave(
+          save.copyWith(
+            base: save.base.copyWith(intelCenterLevel: 2),
+            intelTrophies: {EnemyFactionId.nexusRobotics.name: 2},
+          ),
+        );
+
+        expect(notifier.intelYieldFor(EnemyFactionId.nexusRobotics), 10);
+        expect(
+          notifier.processIntelTrophy(EnemyFactionId.nexusRobotics),
+          isTrue,
+        );
+
+        final updated = container.read(gameStateProvider);
+        expect(updated.resources.data, 10);
+        expect(updated.intelTrophies[EnemyFactionId.nexusRobotics.name], 1);
+      },
+    );
+
+    test('intel trophies are not consumed when data storage is full', () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final notifier = container.read(gameStateProvider.notifier);
+      final save = container.read(gameStateProvider);
+      notifier.loadSave(
+        save.copyWith(
+          resources: save.resources.copyWith(
+            data: save.base.resourceStorageCap,
+          ),
+          intelTrophies: {EnemyFactionId.titanDynamics.name: 1},
+        ),
+      );
+
+      expect(
+        notifier.processIntelTrophy(EnemyFactionId.titanDynamics),
+        isFalse,
+      );
+      expect(
+        container
+            .read(gameStateProvider)
+            .intelTrophies[EnemyFactionId.titanDynamics.name],
+        1,
+      );
     });
 
     test('completeResearch respects prerequisites and cost', () {

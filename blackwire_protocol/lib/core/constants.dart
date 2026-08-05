@@ -50,6 +50,9 @@ class GameConfig {
   static const int intensiveCareBaseCost = 50;
   static const int intensiveCareCostPerRecoveryDay = 10;
 
+  // --- Intelligence center ----------------------------------------------
+  static const int intelDataPerFacilityLevel = 2;
+
   // --- Rank / XP progression --------------------------------------------
   /// Cumulative XP required to be at rank index N (index 0 == rank 1, the
   /// starting rank at which a soldier picks their specialization).

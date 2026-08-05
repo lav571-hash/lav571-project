@@ -8,6 +8,7 @@ import '../../core/constants.dart';
 /// - hangarLevel    -> number of simultaneous missions that can be launched
 /// - warehouseLevel -> resource storage cap (materials & data)
 /// - medbayLevel    -> wound recovery speed and intensive care efficiency
+/// - intelCenterLevel -> data yield from recovered faction trophies
 class BaseState {
   final int barracksLevel;
   final int workshopLevel;
@@ -15,6 +16,7 @@ class BaseState {
   final int hangarLevel;
   final int warehouseLevel;
   final int medbayLevel;
+  final int intelCenterLevel;
 
   const BaseState({
     this.barracksLevel = 1,
@@ -23,6 +25,7 @@ class BaseState {
     this.hangarLevel = 1,
     this.warehouseLevel = 1,
     this.medbayLevel = 1,
+    this.intelCenterLevel = 1,
   });
 
   int get rosterCapacity => 4 + (barracksLevel - 1) * 2;
@@ -39,6 +42,7 @@ class BaseState {
     int? hangarLevel,
     int? warehouseLevel,
     int? medbayLevel,
+    int? intelCenterLevel,
   }) => BaseState(
     barracksLevel: barracksLevel ?? this.barracksLevel,
     workshopLevel: workshopLevel ?? this.workshopLevel,
@@ -46,6 +50,7 @@ class BaseState {
     hangarLevel: hangarLevel ?? this.hangarLevel,
     warehouseLevel: warehouseLevel ?? this.warehouseLevel,
     medbayLevel: medbayLevel ?? this.medbayLevel,
+    intelCenterLevel: intelCenterLevel ?? this.intelCenterLevel,
   );
 
   Map<String, dynamic> toJson() => {
@@ -55,6 +60,7 @@ class BaseState {
     'hangarLevel': hangarLevel,
     'warehouseLevel': warehouseLevel,
     'medbayLevel': medbayLevel,
+    'intelCenterLevel': intelCenterLevel,
   };
 
   factory BaseState.fromJson(Map<String, dynamic> json) => BaseState(
@@ -64,6 +70,7 @@ class BaseState {
     hangarLevel: json['hangarLevel'] as int? ?? 1,
     warehouseLevel: json['warehouseLevel'] as int? ?? 1,
     medbayLevel: json['medbayLevel'] as int? ?? 1,
+    intelCenterLevel: json['intelCenterLevel'] as int? ?? 1,
   );
 }
 

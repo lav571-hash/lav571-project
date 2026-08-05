@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/constants.dart';
 import '../../data/content/equipment_catalog.dart';
+import '../../data/models/faction.dart';
 import '../../data/models/soldier.dart';
 import '../../state/game_state_notifier.dart';
 
@@ -12,6 +13,12 @@ class BaseScreen extends ConsumerWidget {
   static const _facilities = [
     ('barracks', 'Казармы', Icons.bed, 'Вместимость отряда'),
     ('medbay', 'Медотсек', Icons.local_hospital, 'Восстановление раненых'),
+    (
+      'intelCenter',
+      'Разведцентр',
+      Icons.hub,
+      'Анализ трофеев и перехваченных данных',
+    ),
     (
       'workshop',
       'Мастерская',
@@ -48,6 +55,8 @@ class BaseScreen extends ConsumerWidget {
             'warehouse' => 'лимит ${save.base.resourceStorageCap}',
             'medbay' =>
               '×${save.base.recoverySpeedMultiplier.toStringAsFixed(2)} · интенсивная терапия −${save.base.intensiveCareDays.toStringAsFixed(0)} дн.',
+            'intelCenter' =>
+              '+${save.base.intelCenterLevel * GameConfig.intelDataPerFacilityLevel} ◆ к анализу',
             _ => 'ур. $level',
           };
 
@@ -112,6 +121,52 @@ class BaseScreen extends ConsumerWidget {
                     ],
                   ),
                 ],
+              ),
+            ),
+          );
+        }),
+        const SizedBox(height: 16),
+        const _SectionTitle('РАЗВЕДЦЕНТР: ТРОФЕИ'),
+        const SizedBox(height: 8),
+        if (!EnemyFactionId.values.any((f) => notifier.trophyCount(f) > 0))
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: Text(
+              'Нет трофеев для анализа. Побеждайте корпорации на миссиях.',
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
+          ),
+        ...EnemyFactionId.values.where((f) => notifier.trophyCount(f) > 0).map((
+          factionId,
+        ) {
+          final def = kFactionDefs[factionId]!;
+          final count = notifier.trophyCount(factionId);
+          final yieldAmount = notifier.intelYieldFor(factionId);
+          return Card(
+            color: AppColors.surfaceAlt,
+            margin: const EdgeInsets.only(bottom: 8),
+            child: ListTile(
+              leading: Icon(Icons.memory, color: def.color),
+              title: Text(
+                def.trophyName,
+                style: const TextStyle(color: AppColors.textPrimary),
+              ),
+              subtitle: Text(
+                '${def.name} · доступно: $count',
+                style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 12,
+                ),
+              ),
+              trailing: ElevatedButton(
+                onPressed: notifier.canProcessTrophy(factionId)
+                    ? () => notifier.processIntelTrophy(factionId)
+                    : null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.neonCyan,
+                  foregroundColor: Colors.black,
+                ),
+                child: Text('Анализ (+◆$yieldAmount)'),
               ),
             ),
           );

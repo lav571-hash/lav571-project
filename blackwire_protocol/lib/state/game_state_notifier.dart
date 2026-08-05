@@ -30,6 +30,7 @@ class FacilityCosts {
     'hangar': 300,
     'warehouse': 180,
     'medbay': 220,
+    'intelCenter': 240,
   };
   static const Map<String, int> materialCostPerLevel = {
     'barracks': 20,
@@ -38,6 +39,7 @@ class FacilityCosts {
     'hangar': 35,
     'warehouse': 15,
     'medbay': 20,
+    'intelCenter': 25,
   };
 
   static int creditsFor(String facilityId, int nextLevel) =>
@@ -296,6 +298,7 @@ class GameStateNotifier extends Notifier<GameSave> {
     'hangar' => state.base.hangarLevel,
     'warehouse' => state.base.warehouseLevel,
     'medbay' => state.base.medbayLevel,
+    'intelCenter' => state.base.intelCenterLevel,
     _ => 1,
   };
 
@@ -315,6 +318,7 @@ class GameStateNotifier extends Notifier<GameSave> {
       'hangar' => state.base.copyWith(hangarLevel: nextLevel),
       'warehouse' => state.base.copyWith(warehouseLevel: nextLevel),
       'medbay' => state.base.copyWith(medbayLevel: nextLevel),
+      'intelCenter' => state.base.copyWith(intelCenterLevel: nextLevel),
       _ => state.base,
     };
     state = state.copyWith(
@@ -322,6 +326,44 @@ class GameStateNotifier extends Notifier<GameSave> {
       resources: state.resources.copyWith(
         credits: state.resources.credits - creditCost,
         materials: state.resources.materials - materialCost,
+      ),
+    );
+    unawaited(_persist());
+    return true;
+  }
+
+  int trophyCount(EnemyFactionId factionId) =>
+      state.intelTrophies[factionId.name] ?? 0;
+
+  int intelYieldFor(EnemyFactionId factionId) {
+    final factionBaseYield = switch (factionId) {
+      EnemyFactionId.titanDynamics => 4,
+      EnemyFactionId.nexusRobotics => 6,
+      EnemyFactionId.chimeraLabs => 5,
+    };
+    return factionBaseYield +
+        state.base.intelCenterLevel * GameConfig.intelDataPerFacilityLevel;
+  }
+
+  bool canProcessTrophy(EnemyFactionId factionId) =>
+      trophyCount(factionId) > 0 &&
+      state.resources.data + intelYieldFor(factionId) <=
+          state.base.resourceStorageCap;
+
+  bool processIntelTrophy(EnemyFactionId factionId) {
+    if (!canProcessTrophy(factionId)) return false;
+
+    final trophies = Map<String, int>.from(state.intelTrophies);
+    final remaining = trophyCount(factionId) - 1;
+    if (remaining == 0) {
+      trophies.remove(factionId.name);
+    } else {
+      trophies[factionId.name] = remaining;
+    }
+    state = state.copyWith(
+      intelTrophies: trophies,
+      resources: state.resources.copyWith(
+        data: state.resources.data + intelYieldFor(factionId),
       ),
     );
     unawaited(_persist());
@@ -527,6 +569,8 @@ class GameStateNotifier extends Notifier<GameSave> {
     Resources loot = const Resources();
     var threats = state.factionThreats;
     var chaos = state.chaosLevel;
+    var trophiesRecovered = 0;
+    final intelTrophies = Map<String, int>.from(state.intelTrophies);
 
     if (victory) {
       loot = Resources(
@@ -534,6 +578,9 @@ class GameStateNotifier extends Notifier<GameSave> {
         materials: 8 + mission.difficulty * 4,
         data: 6 + mission.difficulty * 3,
       );
+      trophiesRecovered = 1 + mission.difficulty ~/ 3;
+      intelTrophies[mission.factionId.name] =
+          (intelTrophies[mission.factionId.name] ?? 0) + trophiesRecovered;
       threats = threats
           .map(
             (f) => f.factionId == mission.factionId
@@ -569,6 +616,7 @@ class GameStateNotifier extends Notifier<GameSave> {
       factionThreats: threats,
       chaosLevel: chaos,
       activeMissions: missions,
+      intelTrophies: intelTrophies,
     );
     unawaited(_persist());
 
@@ -578,6 +626,7 @@ class GameStateNotifier extends Notifier<GameSave> {
       killedInAction: killed,
       wounded: wounded,
       factionName: kFactionDefs[mission.factionId]!.name,
+      trophiesRecovered: trophiesRecovered,
     );
   }
 }

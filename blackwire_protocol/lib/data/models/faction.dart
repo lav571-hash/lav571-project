@@ -9,6 +9,7 @@ class FactionDef {
   final String enemyTypeName;
   final Color color;
   final String description;
+  final String trophyName;
 
   const FactionDef({
     required this.id,
@@ -16,6 +17,7 @@ class FactionDef {
     required this.enemyTypeName,
     required this.color,
     required this.description,
+    required this.trophyName,
   });
 }
 
@@ -26,6 +28,7 @@ const Map<EnemyFactionId, FactionDef> kFactionDefs = {
     enemyTypeName: 'PMC-оперативник',
     color: AppColors.titanDynamics,
     description: 'Частная военная корпорация. Хорошо вооружённые наёмники.',
+    trophyName: 'Шифрованный архив ЧВК',
   ),
   EnemyFactionId.nexusRobotics: FactionDef(
     id: EnemyFactionId.nexusRobotics,
@@ -33,6 +36,7 @@ const Map<EnemyFactionId, FactionDef> kFactionDefs = {
     enemyTypeName: 'Боевой дроид',
     color: AppColors.nexusRobotics,
     description: 'Корпорация автономных боевых систем и дронов.',
+    trophyName: 'Ядро памяти дроида',
   ),
   EnemyFactionId.chimeraLabs: FactionDef(
     id: EnemyFactionId.chimeraLabs,
@@ -40,6 +44,7 @@ const Map<EnemyFactionId, FactionDef> kFactionDefs = {
     enemyTypeName: 'Мутант-биоформ',
     color: AppColors.chimeraLabs,
     description: 'Биотех-корпорация, создающая нестабильные организмы.',
+    trophyName: 'Биообразец Chimera',
   ),
 };
 

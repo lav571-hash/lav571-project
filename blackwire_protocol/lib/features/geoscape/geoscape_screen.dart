@@ -98,6 +98,11 @@ class _GeoscapeScreenState extends ConsumerState<GeoscapeScreen> {
                 'Награда: ₡${result.loot.credits} · ⚙${result.loot.materials} · ◆${result.loot.data}',
                 style: const TextStyle(color: AppColors.neonGreen),
               ),
+            if (result.trophiesRecovered > 0)
+              Text(
+                'Трофеи разведки: ${result.trophiesRecovered}',
+                style: const TextStyle(color: AppColors.neonCyan),
+              ),
             if (result.wounded.isNotEmpty)
               Text(
                 'Ранены: ${result.wounded.join(', ')}',

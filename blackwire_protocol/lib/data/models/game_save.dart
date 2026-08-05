@@ -16,6 +16,7 @@ class GameSave {
   final Set<String> unlockedAbilityIds;
   final Map<String, int> weaponStock;
   final Map<String, int> armorStock;
+  final Map<String, int> intelTrophies;
   final List<FactionThreat> factionThreats;
   final double chaosLevel;
   final List<MissionSite> activeMissions;
@@ -33,6 +34,7 @@ class GameSave {
     required this.unlockedAbilityIds,
     required this.weaponStock,
     required this.armorStock,
+    this.intelTrophies = const {},
     required this.factionThreats,
     required this.chaosLevel,
     required this.activeMissions,
@@ -73,6 +75,7 @@ class GameSave {
     Set<String>? unlockedAbilityIds,
     Map<String, int>? weaponStock,
     Map<String, int>? armorStock,
+    Map<String, int>? intelTrophies,
     List<FactionThreat>? factionThreats,
     double? chaosLevel,
     List<MissionSite>? activeMissions,
@@ -90,6 +93,7 @@ class GameSave {
       unlockedAbilityIds: unlockedAbilityIds ?? this.unlockedAbilityIds,
       weaponStock: weaponStock ?? this.weaponStock,
       armorStock: armorStock ?? this.armorStock,
+      intelTrophies: intelTrophies ?? this.intelTrophies,
       factionThreats: factionThreats ?? this.factionThreats,
       chaosLevel: chaosLevel ?? this.chaosLevel,
       activeMissions: activeMissions ?? this.activeMissions,
@@ -109,6 +113,7 @@ class GameSave {
     'unlockedAbilityIds': unlockedAbilityIds.toList(),
     'weaponStock': weaponStock,
     'armorStock': armorStock,
+    'intelTrophies': intelTrophies,
     'factionThreats': factionThreats.map((f) => f.toJson()).toList(),
     'chaosLevel': chaosLevel,
     'activeMissions': activeMissions.map((m) => m.toJson()).toList(),
@@ -135,6 +140,9 @@ class GameSave {
         .toSet(),
     weaponStock: Map<String, int>.from(json['weaponStock'] as Map),
     armorStock: Map<String, int>.from(json['armorStock'] as Map),
+    intelTrophies: Map<String, int>.from(
+      json['intelTrophies'] as Map? ?? const {},
+    ),
     factionThreats: (json['factionThreats'] as List)
         .map((f) => FactionThreat.fromJson(f as Map<String, dynamic>))
         .toList(),
