@@ -1,3 +1,4 @@
+import '../../core/constants.dart';
 import '../../data/content/equipment_catalog.dart';
 import '../../data/models/equipment.dart';
 import '../../data/models/faction.dart';
@@ -5,10 +6,9 @@ import '../../data/models/faction.dart';
 /// Base stat block for an enemy archetype belonging to a faction. Stats are
 /// mildly scaled by mission difficulty (1-5) when instantiated.
 ///
-/// Each faction has one signature "fear attack": instead of a normal shot,
-/// the enemy has a [fearAttackChance] chance to unleash it, forcing a Will
-/// check (see `BattleController`) on the target and any other player units
-/// within [fearAttackRadius] tiles.
+/// Each faction has one signature "fear attack": after a normal shot, the
+/// enemy has a [fearAttackChance] chance to trigger it, forcing a Will check
+/// (see `BattleController`) on nearby player units.
 class EnemyDef {
   final EnemyFactionId factionId;
   final String name;
@@ -30,7 +30,7 @@ class EnemyDef {
     required this.weapon,
     this.damageReduction = 0,
     required this.fearAttackName,
-    this.fearAttackChance = 0.25,
+    this.fearAttackChance = GameConfig.enemyFearAttackChance,
     this.fearAttackRadius = 3,
   });
 }

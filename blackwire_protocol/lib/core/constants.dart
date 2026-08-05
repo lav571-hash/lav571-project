@@ -48,6 +48,13 @@ class GameConfig {
   static const double autoOperationSecondsPerDifficulty = 10;
   static const int maxOperationReports = 10;
 
+  // --- Tactical AI & difficulty balance ---------------------------------
+  static const int aiDetectionRange = 8;
+  static const double aiRetreatHpFraction = 0.35;
+  static const int enemyHpPerDifficulty = 3;
+  static const int enemyAccuracyPerDifficulty = 2;
+  static const double enemyFearAttackChance = 0.18;
+
   // --- Medbay ------------------------------------------------------------
   static const double medbayRecoveryBonusPerLevel = 0.25;
   static const int intensiveCareBaseCost = 50;

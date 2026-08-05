@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import '../../core/constants.dart';
 import '../combat/combat_resolver.dart';
 import '../map/line_of_sight.dart';
 import '../map/pathfinding.dart';
@@ -29,15 +30,12 @@ class AiTurnResult {
   });
 }
 
-/// A deliberately simple enemy AI for the MVP:
-/// 1. If a player unit is visible and in weapon range -> attack it.
-/// 2. Else if a player unit is visible but out of range -> move as close as
-///    possible, then attack if now in range.
-/// 3. Else -> move to a random reachable tile (patrol behaviour).
+/// Tactical enemy AI: attacks vulnerable targets, advances through cover,
+/// and retreats to a protected position when critically wounded.
 class SimpleAi {
   final Random random;
   final CombatResolver combatResolver;
-  static const int detectionRange = 10;
+  static const int detectionRange = GameConfig.aiDetectionRange;
 
   SimpleAi({Random? random, CombatResolver? combatResolver})
     : random = random ?? Random(),
@@ -51,34 +49,28 @@ class SimpleAi {
     final targets = allUnits
         .where((u) => u.team == Team.player && u.isAlive)
         .toList();
-    final visibleTargets = targets
-        .where(
-          (t) =>
-              t.position.chebyshevDistanceTo(enemy.position) <= detectionRange,
-        )
-        .where(
-          (t) => LineOfSight.hasLineOfSight(map, enemy.position, t.position),
-        )
-        .toList();
+    var visibleTargets = _visibleTargets(map, enemy, targets);
 
     List<GridPos>? movePath;
 
-    TacticalUnit? inRangeTarget = _bestAttackTarget(map, enemy, visibleTargets);
+    TacticalUnit? inRangeTarget;
+    if (enemy.hpFraction <= GameConfig.aiRetreatHpFraction &&
+        visibleTargets.isNotEmpty) {
+      final reachable = _reachableTiles(map, enemy, allUnits);
+      final bestTile = _bestRetreatTile(map, reachable.keys, visibleTargets);
+      if (bestTile != null) {
+        movePath = reachable[bestTile];
+        enemy.position = bestTile;
+        enemy.hasMoved = true;
+      }
+    } else {
+      inRangeTarget = _bestAttackTarget(map, enemy, visibleTargets);
+    }
 
-    if (inRangeTarget == null && visibleTargets.isNotEmpty) {
-      // Move toward the nearest visible target.
-      final blocked = allUnits
-          .where((u) => u.isAlive && u.id != enemy.id)
-          .map((u) => u.position)
-          .toSet();
-      final reachable = Pathfinding.reachableTiles(
-        map,
-        enemy.position,
-        enemy.movementRange,
-        blocked: blocked,
-      );
-      GridPos? bestTile;
-      double bestDist = double.infinity;
+    if (inRangeTarget == null &&
+        visibleTargets.isNotEmpty &&
+        enemy.hpFraction > GameConfig.aiRetreatHpFraction) {
+      final reachable = _reachableTiles(map, enemy, allUnits);
       final nearestTarget = visibleTargets.reduce(
         (a, b) =>
             a.position.chebyshevDistanceTo(enemy.position) <=
@@ -86,37 +78,22 @@ class SimpleAi {
             ? a
             : b,
       );
-      for (final tile in reachable.keys) {
-        final d = tile.distanceTo(nearestTarget.position);
-        if (d < bestDist) {
-          bestDist = d;
-          bestTile = tile;
-        }
-      }
+      final bestTile = _bestAdvanceTile(
+        map,
+        enemy,
+        reachable.keys,
+        nearestTarget,
+        visibleTargets,
+      );
       if (bestTile != null) {
         movePath = reachable[bestTile];
         enemy.position = bestTile;
         enemy.hasMoved = true;
       }
-      // Re-evaluate targets after moving.
-      final visibleAfterMove = targets
-          .where(
-            (t) => LineOfSight.hasLineOfSight(map, enemy.position, t.position),
-          )
-          .toList();
-      inRangeTarget = _bestAttackTarget(map, enemy, visibleAfterMove);
+      visibleTargets = _visibleTargets(map, enemy, targets);
+      inRangeTarget = _bestAttackTarget(map, enemy, visibleTargets);
     } else if (visibleTargets.isEmpty) {
-      // Patrol: move to a random reachable tile.
-      final blocked = allUnits
-          .where((u) => u.isAlive && u.id != enemy.id)
-          .map((u) => u.position)
-          .toSet();
-      final reachable = Pathfinding.reachableTiles(
-        map,
-        enemy.position,
-        enemy.movementRange,
-        blocked: blocked,
-      );
+      final reachable = _reachableTiles(map, enemy, allUnits);
       if (reachable.isNotEmpty && random.nextBool()) {
         final keys = reachable.keys.toList();
         final chosen = keys[random.nextInt(keys.length)];
@@ -149,7 +126,7 @@ class SimpleAi {
       }
     }
 
-    enemy.hasMoved = true; // Enemies use their whole turn at once in the MVP.
+    enemy.hasMoved = true;
     enemy.hasActed = true;
 
     return AiTurnResult(
@@ -161,6 +138,110 @@ class SimpleAi {
       fearAttackName: fearAttackName,
     );
   }
+
+  List<TacticalUnit> _visibleTargets(
+    TacticalMap map,
+    TacticalUnit enemy,
+    List<TacticalUnit> targets,
+  ) => targets
+      .where(
+        (target) =>
+            target.position.chebyshevDistanceTo(enemy.position) <=
+            detectionRange,
+      )
+      .where(
+        (target) =>
+            LineOfSight.hasLineOfSight(map, enemy.position, target.position),
+      )
+      .toList();
+
+  Map<GridPos, List<GridPos>> _reachableTiles(
+    TacticalMap map,
+    TacticalUnit enemy,
+    List<TacticalUnit> allUnits,
+  ) {
+    final blocked = allUnits
+        .where((unit) => unit.isAlive && unit.id != enemy.id)
+        .map((unit) => unit.position)
+        .toSet();
+    return Pathfinding.reachableTiles(
+      map,
+      enemy.position,
+      enemy.movementRange,
+      blocked: blocked,
+    );
+  }
+
+  GridPos? _bestAdvanceTile(
+    TacticalMap map,
+    TacticalUnit enemy,
+    Iterable<GridPos> candidates,
+    TacticalUnit nearestTarget,
+    List<TacticalUnit> visibleTargets,
+  ) {
+    GridPos? bestTile;
+    var bestScore = -double.infinity;
+    for (final tile in candidates) {
+      final distance = tile.chebyshevDistanceTo(nearestTarget.position);
+      final canAttackAfterMove =
+          distance <= enemy.effectiveWeaponRange &&
+          LineOfSight.hasLineOfSight(map, tile, nearestTarget.position);
+      final cover = _coverScore(map, tile, visibleTargets);
+      final score = (canAttackAfterMove ? 1000 : 0) + cover - distance * 10;
+      if (score > bestScore ||
+          (score == bestScore && _preferredTieBreak(tile, bestTile))) {
+        bestScore = score;
+        bestTile = tile;
+      }
+    }
+    return bestTile;
+  }
+
+  GridPos? _bestRetreatTile(
+    TacticalMap map,
+    Iterable<GridPos> candidates,
+    List<TacticalUnit> threats,
+  ) {
+    GridPos? bestTile;
+    var bestScore = -double.infinity;
+    for (final tile in candidates) {
+      final cover = _coverScore(map, tile, threats) * 5;
+      final distance = threats
+          .map((target) => tile.chebyshevDistanceTo(target.position))
+          .reduce(min);
+      final breaksSight = threats.every(
+        (target) => !LineOfSight.hasLineOfSight(map, tile, target.position),
+      );
+      final score = cover + distance * 5 + (breaksSight ? 200 : 0);
+      if (score > bestScore ||
+          (score == bestScore && _preferredTieBreak(tile, bestTile))) {
+        bestScore = score;
+        bestTile = tile;
+      }
+    }
+    return bestTile;
+  }
+
+  double _coverScore(
+    TacticalMap map,
+    GridPos tile,
+    List<TacticalUnit> threats,
+  ) {
+    if (threats.isEmpty) return 0;
+    return threats
+        .map(
+          (target) => CombatResolver.coverPenalty(
+            CombatResolver.coverLevelFor(map, tile, target.position),
+          ),
+        )
+        .reduce(max)
+        .toDouble();
+  }
+
+  bool _preferredTieBreak(GridPos candidate, GridPos? current) =>
+      current == null ||
+      candidate.y < current.y ||
+      (candidate.y == current.y && candidate.x < current.x);
 
   TacticalUnit? _bestAttackTarget(
     TacticalMap map,

@@ -5,6 +5,8 @@ import '../data/content/equipment_catalog.dart';
 import '../data/models/faction.dart';
 import '../data/models/soldier.dart';
 import 'battle_controller.dart';
+import 'ai/simple_ai.dart';
+import 'combat/combat_resolver.dart';
 import 'map/map_generator.dart';
 import 'map/tile.dart';
 import 'units/enemy_defs.dart';
@@ -72,7 +74,9 @@ class BattleFactory {
 
     final enemyDef = kEnemyDefs[factionId]!;
     for (int i = 0; i < enemySpawns.length; i++) {
-      final hpBonus = (difficulty - 1) * 4;
+      final hpBonus = (difficulty - 1) * GameConfig.enemyHpPerDifficulty;
+      final accuracyBonus =
+          (difficulty - 1) * GameConfig.enemyAccuracyPerDifficulty;
       units.add(
         TacticalUnit(
           id: 'enemy_${factionId.name}_$i',
@@ -81,7 +85,7 @@ class BattleFactory {
           maxHp: enemyDef.maxHp + hpBonus,
           position: enemySpawns[i],
           movementRange: enemyDef.movementRange,
-          baseAccuracy: enemyDef.baseAccuracy,
+          baseAccuracy: enemyDef.baseAccuracy + accuracyBonus,
           weapon: enemyDef.weapon,
           damageReduction: enemyDef.damageReduction,
           enemyFactionId: factionId,
@@ -89,6 +93,14 @@ class BattleFactory {
       );
     }
 
-    return BattleController(map: map, units: units);
+    final combatResolver = CombatResolver(random: rng);
+    final ai = SimpleAi(random: rng, combatResolver: combatResolver);
+    return BattleController(
+      map: map,
+      units: units,
+      combatResolver: combatResolver,
+      ai: ai,
+      random: rng,
+    );
   }
 }
