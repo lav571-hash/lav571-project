@@ -190,6 +190,66 @@ void main() {
     });
 
     test(
+      'fog of war hides distant enemies until the squad advances into vision',
+      () {
+        final map = TacticalMap(width: 16, height: 7);
+        final player = TacticalUnit(
+          id: 'p1',
+          team: Team.player,
+          displayName: 'Reclaim-1',
+          maxHp: 100,
+          position: const GridPos(1, 3),
+          movementRange: 5,
+          baseAccuracy: 65,
+          weapon: kWeaponCatalog['pistol_mk1']!,
+        );
+        final enemy = TacticalUnit(
+          id: 'e1',
+          team: Team.enemy,
+          displayName: 'Distant Merc',
+          maxHp: 50,
+          position: const GridPos(14, 3),
+          movementRange: 5,
+          baseAccuracy: 58,
+          weapon: kWeaponCatalog['pistol_mk1']!,
+        );
+        final rng = _ZeroRandom();
+        final resolver = CombatResolver(random: rng);
+        final controller = BattleController(
+          map: map,
+          units: [player, enemy],
+          combatResolver: resolver,
+          ai: SimpleAi(random: rng, combatResolver: resolver),
+          random: rng,
+        );
+
+        expect(controller.isEnemyVisible(enemy), isFalse);
+
+        // ZeroRandom.nextBool is false, so unseen enemies do not patrol.
+        controller.endPlayerTurn();
+        expect(enemy.position, const GridPos(14, 3));
+        expect(controller.isEnemyVisible(enemy), isFalse);
+
+        controller.selectUnit(player.id);
+        expect(controller.moveSelectedTo(const GridPos(6, 3)), isTrue);
+        expect(controller.isEnemyVisible(enemy), isTrue);
+
+        final before = enemy.position;
+        controller.endPlayerTurn();
+
+        expect(controller.phase, BattlePhase.playerTurn);
+        expect(enemy.position, isNot(before));
+        expect(controller.isEnemyVisible(enemy), isTrue);
+        expect(
+          controller.log.any(
+            (e) => e.text.contains('Distant Merc перемещается'),
+          ),
+          isTrue,
+        );
+      },
+    );
+
+    test(
       'battle is deterministic-ish across many seeded runs without crashing',
       () {
         for (int seed = 0; seed < 25; seed++) {
