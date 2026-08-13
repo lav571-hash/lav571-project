@@ -1,11 +1,22 @@
 import 'dart:math';
 
 import 'package:blackwire_protocol/data/content/equipment_catalog.dart';
+import 'package:blackwire_protocol/game/ai/simple_ai.dart';
 import 'package:blackwire_protocol/game/battle_controller.dart';
+import 'package:blackwire_protocol/game/combat/combat_resolver.dart';
 import 'package:blackwire_protocol/game/map/tactical_map.dart';
 import 'package:blackwire_protocol/game/map/tile.dart';
 import 'package:blackwire_protocol/game/units/tactical_unit.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+class _ZeroRandom implements Random {
+  @override
+  bool nextBool() => false;
+  @override
+  double nextDouble() => 0;
+  @override
+  int nextInt(int max) => 0;
+}
 
 BattleController _simpleController() {
   final map = TacticalMap(width: 10, height: 10);
@@ -116,6 +127,67 @@ void main() {
         }
       },
     );
+
+    test('enemy turn logs a wounded unit retreating behind cover instead of shooting', () {
+      final map = TacticalMap(width: 9, height: 7);
+      map.setTile(const GridPos(2, 3), TileType.crate);
+      final player = TacticalUnit(
+        id: 'p1',
+        team: Team.player,
+        displayName: 'Reclaim-1',
+        maxHp: 100,
+        position: const GridPos(7, 3),
+        movementRange: 5,
+        baseAccuracy: 65,
+        weapon: kWeaponCatalog['pistol_mk1']!,
+      );
+      final enemy = TacticalUnit(
+        id: 'e1',
+        team: Team.enemy,
+        displayName: 'Wounded Merc',
+        maxHp: 50,
+        currentHp: 15,
+        position: const GridPos(4, 3),
+        movementRange: 5,
+        baseAccuracy: 58,
+        weapon: kWeaponCatalog['pistol_mk1']!,
+      );
+      final rng = _ZeroRandom();
+      final resolver = CombatResolver(random: rng);
+      final controller = BattleController(
+        map: map,
+        units: [player, enemy],
+        combatResolver: resolver,
+        ai: SimpleAi(random: rng, combatResolver: resolver),
+        random: rng,
+      );
+      final startDistance = enemy.position.chebyshevDistanceTo(player.position);
+
+      controller.endPlayerTurn();
+
+      expect(controller.phase, BattlePhase.playerTurn);
+      expect(
+        enemy.position.chebyshevDistanceTo(player.position),
+        greaterThan(startDistance),
+      );
+      expect(
+        CombatResolver.coverLevelFor(map, enemy.position, player.position),
+        isNot(CoverLevel.none),
+      );
+      expect(
+        controller.log.map((e) => e.text),
+        contains(
+          'Wounded Merc перемещается на ${enemy.position.x},${enemy.position.y}.',
+        ),
+      );
+      expect(
+        controller.log.any(
+          (e) =>
+              e.text.contains('попадает') || e.text.contains('промахивается'),
+        ),
+        isFalse,
+      );
+    });
 
     test(
       'battle is deterministic-ish across many seeded runs without crashing',

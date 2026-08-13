@@ -1,13 +1,26 @@
+import 'dart:math';
+
 import 'package:blackwire_protocol/data/content/equipment_catalog.dart';
 import 'package:blackwire_protocol/data/models/faction.dart';
 import 'package:blackwire_protocol/data/models/mission_site.dart';
 import 'package:blackwire_protocol/features/tactical/tactical_screen.dart';
+import 'package:blackwire_protocol/game/ai/simple_ai.dart';
 import 'package:blackwire_protocol/game/battle_controller.dart';
+import 'package:blackwire_protocol/game/combat/combat_resolver.dart';
 import 'package:blackwire_protocol/game/map/tactical_map.dart';
 import 'package:blackwire_protocol/game/map/tile.dart';
 import 'package:blackwire_protocol/game/units/tactical_unit.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+class _ZeroRandom implements Random {
+  @override
+  bool nextBool() => false;
+  @override
+  double nextDouble() => 0;
+  @override
+  int nextInt(int max) => 0;
+}
 
 /// [TacticalScreen] hosts a Flame [GameWidget] with a continuously running
 /// game loop ticker, so `pumpAndSettle` never settles on it. Use a bounded
@@ -151,6 +164,60 @@ void main() {
       await _pumpFrames(tester);
 
       expect(poppedResult, same(controller));
+    },
+  );
+
+  testWidgets(
+    'ending the player turn surfaces enemy retreat movement in the combat log',
+    (tester) async {
+      final map = TacticalMap(width: 9, height: 7);
+      map.setTile(const GridPos(2, 3), TileType.crate);
+      final player = TacticalUnit(
+        id: 'p1',
+        team: Team.player,
+        displayName: 'Reclaim-1',
+        maxHp: 100,
+        position: const GridPos(7, 3),
+        movementRange: 5,
+        baseAccuracy: 65,
+        weapon: kWeaponCatalog['pistol_mk1']!,
+      );
+      final enemy = TacticalUnit(
+        id: 'e1',
+        team: Team.enemy,
+        displayName: 'Wounded Merc',
+        maxHp: 50,
+        currentHp: 15,
+        position: const GridPos(4, 3),
+        movementRange: 5,
+        baseAccuracy: 58,
+        weapon: kWeaponCatalog['pistol_mk1']!,
+      );
+      final rng = _ZeroRandom();
+      final resolver = CombatResolver(random: rng);
+      final controller = BattleController(
+        map: map,
+        units: [player, enemy],
+        combatResolver: resolver,
+        ai: SimpleAi(random: rng, combatResolver: resolver),
+        random: rng,
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: TacticalScreen(controller: controller, mission: _mission()),
+        ),
+      );
+      await _pumpFrames(tester);
+
+      await tester.tap(find.text('ЗАКОНЧИТЬ ХОД'));
+      await _pumpFrames(tester, times: 8);
+
+      expect(find.textContaining('ХОД 2'), findsOneWidget);
+      expect(
+        find.textContaining('Wounded Merc перемещается на'),
+        findsOneWidget,
+      );
     },
   );
 }

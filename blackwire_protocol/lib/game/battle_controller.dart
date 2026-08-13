@@ -193,6 +193,13 @@ class BattleController {
       if (phase != BattlePhase.enemyTurn) break;
       if (!enemy.isAlive) continue;
       final result = ai.takeTurn(map, enemy, units);
+      if (result.movePath != null && result.movePath!.isNotEmpty) {
+        log.add(
+          CombatLogEntry(
+            '${enemy.displayName} перемещается на ${enemy.position.x},${enemy.position.y}.',
+          ),
+        );
+      }
       if (result.attackResult != null && result.attackedTarget != null) {
         final r = result.attackResult!;
         final target = result.attackedTarget!;
