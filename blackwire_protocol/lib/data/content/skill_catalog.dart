@@ -102,7 +102,8 @@ class SkillCatalog {
     Specialization.assault: SkillDef(
       id: 'assault_sig_flank',
       name: 'Инстинкт фланга',
-      description: '+3 к урону оружия при атаках с флангов.',
+      description:
+          '+3 к урону оружия. Раз за бой: натиск в упор — атака в обход укрытия цели.',
       specialization: Specialization.assault,
       effect: SkillEffect(SkillEffectType.weaponDamage, 3),
       repeatable: false,
@@ -110,7 +111,8 @@ class SkillCatalog {
     Specialization.sniper: SkillDef(
       id: 'sniper_sig_range',
       name: 'Дальний прицел',
-      description: '+2 к дальности оружия.',
+      description:
+          '+2 к дальности оружия. Раз за бой: прицельный выстрел без движения — +25 к меткости и +8 к урону.',
       specialization: Specialization.sniper,
       effect: SkillEffect(SkillEffectType.weaponRange, 2),
       repeatable: false,
@@ -118,7 +120,8 @@ class SkillCatalog {
     Specialization.heavy: SkillDef(
       id: 'heavy_sig_bulwark',
       name: 'Оплот',
-      description: '+10 к максимальному HP.',
+      description:
+          '+10 к максимальному HP. Раз за бой: подавляющий огонь — цель не наступает и стреляет с −25 к меткости.',
       specialization: Specialization.heavy,
       effect: SkillEffect(SkillEffectType.hp, 10),
       repeatable: false,
@@ -126,7 +129,8 @@ class SkillCatalog {
     Specialization.medic: SkillDef(
       id: 'medic_sig_calm',
       name: 'Спокойствие духа',
-      description: '+6 к психике.',
+      description:
+          '+6 к психике. Раз за бой: полевое лечение соседнего бойца на 25 HP; боец в панике снова может двигаться.',
       specialization: Specialization.medic,
       effect: SkillEffect(SkillEffectType.will, 6),
       repeatable: false,

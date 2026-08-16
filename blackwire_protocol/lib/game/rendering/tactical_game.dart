@@ -60,9 +60,9 @@ class TacticalGame extends FlameGame {
     }
 
     if (selected != null &&
-        controller.aimMode == TacticalAimMode.hack &&
+        controller.aimMode != TacticalAimMode.none &&
         unitAtPos != null) {
-      controller.hackTarget(unitAtPos.id);
+      controller.resolveAimAt(unitAtPos);
       onStateChanged();
       return;
     }

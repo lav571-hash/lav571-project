@@ -54,6 +54,18 @@ class SimpleAi {
     List<GridPos>? movePath;
 
     TacticalUnit? inRangeTarget;
+    if (enemy.isSuppressed) {
+      // Pinned down by suppressing fire: hold position and shoot wildly.
+      inRangeTarget = _bestAttackTarget(map, enemy, visibleTargets);
+      return _resolveAttackPhase(
+        map,
+        enemy,
+        targets,
+        inRangeTarget,
+        null,
+        accuracyPenalty: GameConfig.suppressAccuracyPenalty,
+      );
+    }
     if (enemy.hpFraction <= GameConfig.aiRetreatHpFraction &&
         visibleTargets.isNotEmpty) {
       final reachable = _reachableTiles(map, enemy, allUnits);
@@ -103,11 +115,29 @@ class SimpleAi {
       }
     }
 
+    return _resolveAttackPhase(map, enemy, targets, inRangeTarget, movePath);
+  }
+
+  /// Shoots [inRangeTarget] if there is one, rolls the faction fear attack
+  /// and closes out the unit's turn.
+  AiTurnResult _resolveAttackPhase(
+    TacticalMap map,
+    TacticalUnit enemy,
+    List<TacticalUnit> targets,
+    TacticalUnit? inRangeTarget,
+    List<GridPos>? movePath, {
+    int accuracyPenalty = 0,
+  }) {
     AttackResult? attackResult;
     List<TacticalUnit> panicTargets = const [];
     String? fearAttackName;
     if (inRangeTarget != null) {
-      attackResult = combatResolver.resolveAttack(map, enemy, inRangeTarget);
+      attackResult = combatResolver.resolveAttack(
+        map,
+        enemy,
+        inRangeTarget,
+        accuracyPenalty: accuracyPenalty,
+      );
       enemy.hasActed = true;
 
       final enemyDef = enemy.enemyFactionId == null
@@ -119,7 +149,7 @@ class SimpleAi {
             .where((t) => t.isAlive)
             .where(
               (t) =>
-                  t.position.distanceTo(inRangeTarget!.position) <=
+                  t.position.distanceTo(inRangeTarget.position) <=
                   enemyDef.fearAttackRadius,
             )
             .toList();

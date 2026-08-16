@@ -74,12 +74,15 @@ class CombatResolver {
   int computeHitChance(
     TacticalMap map,
     TacticalUnit shooter,
-    TacticalUnit target,
-  ) {
+    TacticalUnit target, {
+    bool ignoreCover = false,
+  }) {
     final distance = shooter.position.chebyshevDistanceTo(target.position);
     final distancePenalty = (distance / shooter.effectiveWeaponRange * 15)
         .round();
-    final cover = coverLevelFor(map, target.position, shooter.position);
+    final cover = ignoreCover
+        ? CoverLevel.none
+        : coverLevelFor(map, target.position, shooter.position);
     final chance =
         shooter.weapon.baseAccuracy +
         (shooter.baseAccuracy - 65) -
@@ -92,16 +95,25 @@ class CombatResolver {
   /// target's HP and the shooter's per-mission `shotsFired`/`hits`/`kills`
   /// tallies (used later to grow the underlying soldier's stats through
   /// practice). Pass [accuracyPenalty] to reduce the hit chance for special
-  /// cases such as panicked gunfire.
+  /// cases such as panicked gunfire, or [accuracyBonus]/[damageBonus]/
+  /// [ignoreCover] for signature tactical actions.
   AttackResult resolveAttack(
     TacticalMap map,
     TacticalUnit shooter,
     TacticalUnit target, {
     int accuracyPenalty = 0,
+    int accuracyBonus = 0,
+    int damageBonus = 0,
+    bool ignoreCover = false,
   }) {
-    final cover = coverLevelFor(map, target.position, shooter.position);
-    final hitChance = (computeHitChance(map, shooter, target) - accuracyPenalty)
-        .clamp(5, 95);
+    final cover = ignoreCover
+        ? CoverLevel.none
+        : coverLevelFor(map, target.position, shooter.position);
+    final hitChance =
+        (computeHitChance(map, shooter, target, ignoreCover: ignoreCover) -
+                accuracyPenalty +
+                accuracyBonus)
+            .clamp(5, 95);
     final roll = random.nextInt(100);
     final hit = roll < hitChance;
     shooter.shotsFired++;
@@ -113,7 +125,8 @@ class CombatResolver {
           random.nextInt(
             shooter.weapon.maxDamage - shooter.weapon.minDamage + 1,
           ) +
-          shooter.weaponDamageBonus;
+          shooter.weaponDamageBonus +
+          damageBonus;
       if (shooter.critChance > 0 && random.nextInt(100) < shooter.critChance) {
         wasCrit = true;
         damage = (damage * 1.5).round();

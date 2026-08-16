@@ -55,12 +55,28 @@ class GameConfig {
   static const int enemyAccuracyPerDifficulty = 2;
   static const double enemyFearAttackChance = 0.18;
 
-  // --- Technician tactical actions ---------------------------------------
+  // --- Signature tactical actions ----------------------------------------
+  static const String hackSkillId = 'tech_sig_hack';
+  static const String turretSkillId = 'tech_sig_drone';
+  static const String overrunSkillId = 'assault_sig_flank';
+  static const String aimedShotSkillId = 'sniper_sig_range';
+  static const String suppressSkillId = 'heavy_sig_bulwark';
+  static const String fieldHealSkillId = 'medic_sig_calm';
+
   static const int hackRange = 6;
   static const int turretHp = 28;
   static const int turretAccuracy = 62;
-  static const String hackSkillId = 'tech_sig_hack';
-  static const String turretSkillId = 'tech_sig_drone';
+
+  static const int overrunRange = 2;
+  static const int overrunDamageBonus = 6;
+
+  static const int aimedShotAccuracyBonus = 25;
+  static const int aimedShotDamageBonus = 8;
+
+  static const int suppressAccuracyPenalty = 25;
+  static const int suppressTurns = 1;
+
+  static const int fieldHealAmount = 25;
 
   // --- Medbay ------------------------------------------------------------
   static const double medbayRecoveryBonusPerLevel = 0.25;

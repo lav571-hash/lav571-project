@@ -225,7 +225,6 @@ class _TacticalScreenState extends State<TacticalScreen> {
     final canAttack =
         !unit.hasActed && controller.phase == BattlePhase.playerTurn;
     final targets = controller.attackableTargetsForSelected();
-    final hackTargets = controller.hackableTargetsForSelected();
     final deployTiles = controller.deployTilesForSelected();
     return Container(
       padding: const EdgeInsets.all(8),
@@ -242,8 +241,7 @@ class _TacticalScreenState extends State<TacticalScreen> {
             '${unit.isTurret ? ' · автоогонь' : ''}'
             '${canMove ? ' · можно двигаться' : ''}'
             '${canAttack ? (targets.isNotEmpty ? ' · есть цель в зоне поражения' : '') : ''}'
-            '${controller.aimMode == TacticalAimMode.hack ? ' · выберите дроида Nexus' : ''}'
-            '${controller.aimMode == TacticalAimMode.deployTurret ? ' · выберите клетку для турели' : ''}',
+            '${_aimHint(controller.aimMode)}',
             style: const TextStyle(
               color: AppColors.textSecondary,
               fontSize: 12,
@@ -254,36 +252,59 @@ class _TacticalScreenState extends State<TacticalScreen> {
             spacing: 8,
             runSpacing: 4,
             children: [
-              if (unit.canHack && canAttack)
-                _actionChip(
-                  label: hackTargets.length == 1 ? 'Взломать' : 'Взлом',
+              if (canAttack) ...[
+                _signatureChip(
+                  label: 'Взлом',
                   color: AppColors.neonMagenta,
-                  selected: controller.aimMode == TacticalAimMode.hack,
-                  onTap: () {
-                    setState(() {
-                      if (hackTargets.length == 1) {
-                        controller.hackTarget(hackTargets.first.id);
-                      } else {
-                        controller.setAimMode(TacticalAimMode.hack);
-                      }
-                    });
-                  },
+                  mode: TacticalAimMode.hack,
+                  available: unit.canHack,
+                  targets: controller.hackableTargetsForSelected(),
                 ),
-              if (unit.canDeployTurret && canAttack)
-                _actionChip(
-                  label: 'Турель',
+                _signatureChip(
+                  label: 'Натиск',
+                  color: AppColors.titanDynamics,
+                  mode: TacticalAimMode.overrun,
+                  available: unit.canOverrun,
+                  targets: controller.overrunTargetsForSelected(),
+                ),
+                _signatureChip(
+                  label: 'Прицельный',
+                  color: AppColors.neonCyan,
+                  mode: TacticalAimMode.aimedShot,
+                  available: unit.canAimedShot,
+                  targets: controller.aimedShotTargetsForSelected(),
+                ),
+                _signatureChip(
+                  label: 'Подавление',
                   color: AppColors.neonYellow,
-                  selected: controller.aimMode == TacticalAimMode.deployTurret,
-                  onTap: () {
-                    setState(() {
-                      if (deployTiles.length == 1) {
-                        controller.deployTurretAt(deployTiles.first);
-                      } else {
-                        controller.setAimMode(TacticalAimMode.deployTurret);
-                      }
-                    });
-                  },
+                  mode: TacticalAimMode.suppress,
+                  available: unit.canSuppress,
+                  targets: controller.suppressTargetsForSelected(),
                 ),
+                _signatureChip(
+                  label: 'Лечение',
+                  color: AppColors.neonGreen,
+                  mode: TacticalAimMode.fieldHeal,
+                  available: unit.canFieldHeal,
+                  targets: controller.healTargetsForSelected(),
+                ),
+                if (unit.canDeployTurret)
+                  _actionChip(
+                    label: 'Турель',
+                    color: AppColors.neonYellow,
+                    selected:
+                        controller.aimMode == TacticalAimMode.deployTurret,
+                    onTap: () {
+                      setState(() {
+                        if (deployTiles.length == 1) {
+                          controller.deployTurretAt(deployTiles.first);
+                        } else {
+                          controller.setAimMode(TacticalAimMode.deployTurret);
+                        }
+                      });
+                    },
+                  ),
+              ],
               TextButton(
                 onPressed: () => setState(() => controller.skipSelectedUnit()),
                 child: const Text(
@@ -295,6 +316,42 @@ class _TacticalScreenState extends State<TacticalScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  String _aimHint(TacticalAimMode mode) => switch (mode) {
+    TacticalAimMode.hack => ' · выберите дроида Nexus',
+    TacticalAimMode.deployTurret => ' · выберите клетку для турели',
+    TacticalAimMode.overrun => ' · выберите цель в упор',
+    TacticalAimMode.aimedShot => ' · выберите цель для выстрела',
+    TacticalAimMode.suppress => ' · выберите цель для подавления',
+    TacticalAimMode.fieldHeal => ' · выберите раненого союзника рядом',
+    TacticalAimMode.none => '',
+  };
+
+  /// A signature action button. Hidden when the unit lacks the skill or has
+  /// already spent it, and fires immediately when only one target qualifies.
+  Widget _signatureChip({
+    required String label,
+    required Color color,
+    required TacticalAimMode mode,
+    required bool available,
+    required List<TacticalUnit> targets,
+  }) {
+    if (!available || targets.isEmpty) return const SizedBox.shrink();
+    return _actionChip(
+      label: label,
+      color: color,
+      selected: controller.aimMode == mode,
+      onTap: () {
+        setState(() {
+          if (targets.length == 1) {
+            controller.performSignature(mode, targets.first);
+          } else {
+            controller.setAimMode(mode);
+          }
+        });
+      },
     );
   }
 

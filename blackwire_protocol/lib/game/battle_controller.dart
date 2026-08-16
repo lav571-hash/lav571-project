@@ -13,7 +13,15 @@ import 'units/tactical_unit.dart';
 
 enum BattlePhase { playerTurn, enemyTurn, victory, defeat }
 
-enum TacticalAimMode { none, hack, deployTurret }
+enum TacticalAimMode {
+  none,
+  hack,
+  deployTurret,
+  overrun,
+  aimedShot,
+  suppress,
+  fieldHeal,
+}
 
 class CombatLogEntry {
   final String text;
@@ -110,10 +118,44 @@ class BattleController {
     if (phase != BattlePhase.playerTurn) return;
     final unit = selectedUnit;
     if (unit == null || unit.hasActed) return;
-    if (mode == TacticalAimMode.hack && !unit.canHack) return;
-    if (mode == TacticalAimMode.deployTurret && !unit.canDeployTurret) return;
+    final available = switch (mode) {
+      TacticalAimMode.none => true,
+      TacticalAimMode.hack => unit.canHack,
+      TacticalAimMode.deployTurret => unit.canDeployTurret,
+      TacticalAimMode.overrun => unit.canOverrun,
+      TacticalAimMode.aimedShot => unit.canAimedShot,
+      TacticalAimMode.suppress => unit.canSuppress,
+      TacticalAimMode.fieldHeal => unit.canFieldHeal,
+    };
+    if (!available) return;
     aimMode = aimMode == mode ? TacticalAimMode.none : mode;
   }
+
+  /// Targets available for the signature action currently being aimed. Empty
+  /// for modes that target a tile rather than a unit.
+  List<TacticalUnit> aimTargetsForSelected() => switch (aimMode) {
+    TacticalAimMode.hack => hackableTargetsForSelected(),
+    TacticalAimMode.overrun => overrunTargetsForSelected(),
+    TacticalAimMode.aimedShot => aimedShotTargetsForSelected(),
+    TacticalAimMode.suppress => suppressTargetsForSelected(),
+    TacticalAimMode.fieldHeal => healTargetsForSelected(),
+    _ => const [],
+  };
+
+  /// Performs the signature action [mode] against [target]. Returns true
+  /// when the action was performed.
+  bool performSignature(TacticalAimMode mode, TacticalUnit target) =>
+      switch (mode) {
+        TacticalAimMode.hack => hackTarget(target.id),
+        TacticalAimMode.overrun => overrunTarget(target.id) != null,
+        TacticalAimMode.aimedShot => aimedShotTarget(target.id) != null,
+        TacticalAimMode.suppress => suppressTarget(target.id),
+        TacticalAimMode.fieldHeal => fieldHealTarget(target.id),
+        _ => false,
+      };
+
+  /// Routes a tap on [target] to whichever signature action is being aimed.
+  bool resolveAimAt(TacticalUnit target) => performSignature(aimMode, target);
 
   Map<GridPos, List<GridPos>> movementOptionsForSelected() {
     final unit = selectedUnit;
@@ -225,7 +267,7 @@ class BattleController {
     target.hasMoved = true;
     target.hasActed = true;
     unit.hasActed = true;
-    unit.hasUsedHack = true;
+    unit.spendSignature(GameConfig.hackSkillId);
     aimMode = TacticalAimMode.none;
     log.add(
       CombatLogEntry(
@@ -279,7 +321,7 @@ class BattleController {
     turret.hasActed = true;
     units.add(turret);
     unit.hasActed = true;
-    unit.hasDeployedTurret = true;
+    unit.spendSignature(GameConfig.turretSkillId);
     aimMode = TacticalAimMode.none;
     log.add(
       CombatLogEntry(
@@ -287,6 +329,204 @@ class BattleController {
       ),
     );
     _recomputeVisibility();
+    return true;
+  }
+
+  // ---------------------------------------------------------------------
+  // Signature actions: assault / sniper / heavy / medic
+  // ---------------------------------------------------------------------
+
+  List<TacticalUnit> overrunTargetsForSelected() {
+    final unit = selectedUnit;
+    if (unit == null ||
+        unit.hasActed ||
+        !unit.canOverrun ||
+        phase != BattlePhase.playerTurn) {
+      return [];
+    }
+    return aliveEnemyUnits
+        .where(
+          (e) =>
+              unit.position.chebyshevDistanceTo(e.position) <=
+                  GameConfig.overrunRange &&
+              LineOfSight.hasLineOfSight(map, unit.position, e.position),
+        )
+        .toList();
+  }
+
+  /// Assault signature: a point-blank burst that ignores the target's cover
+  /// and hits harder, at the cost of having to close the distance first.
+  AttackResult? overrunTarget(String targetId) {
+    final unit = selectedUnit;
+    if (unit == null || unit.hasActed || phase != BattlePhase.playerTurn) {
+      return null;
+    }
+    final target = overrunTargetsForSelected()
+        .where((u) => u.id == targetId)
+        .firstOrNull;
+    if (target == null) return null;
+
+    final result = combatResolver.resolveAttack(
+      map,
+      unit,
+      target,
+      damageBonus: GameConfig.overrunDamageBonus,
+      ignoreCover: true,
+    );
+    unit.hasActed = true;
+    unit.spendSignature(GameConfig.overrunSkillId);
+    aimMode = TacticalAimMode.none;
+    log.add(
+      CombatLogEntry(
+        result.hit
+            ? '${unit.displayName} идёт в натиск на ${target.displayName} в обход укрытия (${result.damage} урона)${result.targetKilled ? ' — уничтожен!' : ''}'
+            : '${unit.displayName} срывает натиск на ${target.displayName}.',
+      ),
+    );
+    _checkEndConditions();
+    return result;
+  }
+
+  List<TacticalUnit> aimedShotTargetsForSelected() {
+    final unit = selectedUnit;
+    if (unit == null ||
+        unit.hasActed ||
+        !unit.canAimedShot ||
+        phase != BattlePhase.playerTurn) {
+      return [];
+    }
+    return aliveEnemyUnits
+        .where((e) => combatResolver.canAttack(map, unit, e))
+        .toList();
+  }
+
+  /// Sniper signature: only available while the unit has held position, in
+  /// exchange for a large accuracy and damage bonus.
+  AttackResult? aimedShotTarget(String targetId) {
+    final unit = selectedUnit;
+    if (unit == null || unit.hasActed || phase != BattlePhase.playerTurn) {
+      return null;
+    }
+    final target = aimedShotTargetsForSelected()
+        .where((u) => u.id == targetId)
+        .firstOrNull;
+    if (target == null) return null;
+
+    final result = combatResolver.resolveAttack(
+      map,
+      unit,
+      target,
+      accuracyBonus: GameConfig.aimedShotAccuracyBonus,
+      damageBonus: GameConfig.aimedShotDamageBonus,
+    );
+    unit.hasMoved = true;
+    unit.hasActed = true;
+    unit.spendSignature(GameConfig.aimedShotSkillId);
+    aimMode = TacticalAimMode.none;
+    log.add(
+      CombatLogEntry(
+        result.hit
+            ? '${unit.displayName} делает прицельный выстрел по ${target.displayName} (${result.damage} урона)${result.targetKilled ? ' — уничтожен!' : ''}'
+            : '${unit.displayName} промахивается прицельным выстрелом по ${target.displayName}.',
+      ),
+    );
+    _checkEndConditions();
+    return result;
+  }
+
+  List<TacticalUnit> suppressTargetsForSelected() {
+    final unit = selectedUnit;
+    if (unit == null ||
+        unit.hasActed ||
+        !unit.canSuppress ||
+        phase != BattlePhase.playerTurn) {
+      return [];
+    }
+    return aliveEnemyUnits
+        .where((e) => combatResolver.canAttack(map, unit, e))
+        .toList();
+  }
+
+  /// Heavy signature: pins an enemy down. A suppressed unit cannot advance
+  /// and fires at a heavy accuracy penalty on its next turn.
+  bool suppressTarget(String targetId) {
+    final unit = selectedUnit;
+    if (unit == null || unit.hasActed || phase != BattlePhase.playerTurn) {
+      return false;
+    }
+    final target = suppressTargetsForSelected()
+        .where((u) => u.id == targetId)
+        .firstOrNull;
+    if (target == null) return false;
+
+    target.suppressedTurns = GameConfig.suppressTurns;
+    unit.hasActed = true;
+    unit.spendSignature(GameConfig.suppressSkillId);
+    aimMode = TacticalAimMode.none;
+    log.add(
+      CombatLogEntry(
+        '${unit.displayName} прижимает ${target.displayName} подавляющим огнём.',
+      ),
+    );
+    return true;
+  }
+
+  List<TacticalUnit> healTargetsForSelected() {
+    final unit = selectedUnit;
+    if (unit == null ||
+        unit.hasActed ||
+        !unit.canFieldHeal ||
+        phase != BattlePhase.playerTurn) {
+      return [];
+    }
+    return alivePlayerUnits
+        .where(
+          (ally) =>
+              ally.id != unit.id &&
+              !ally.isTurret &&
+              (ally.currentHp < ally.maxHp || ally.isPanicked) &&
+              unit.position.chebyshevDistanceTo(ally.position) <= 1,
+        )
+        .toList();
+  }
+
+  /// Medic signature: patches up an adjacent squadmate and rallies them if
+  /// panic has frozen them this turn, giving their movement back.
+  bool fieldHealTarget(String targetId) {
+    final unit = selectedUnit;
+    if (unit == null || unit.hasActed || phase != BattlePhase.playerTurn) {
+      return false;
+    }
+    final target = healTargetsForSelected()
+        .where((u) => u.id == targetId)
+        .firstOrNull;
+    if (target == null) return false;
+
+    final healed =
+        (target.currentHp + GameConfig.fieldHealAmount).clamp(
+          0,
+          target.maxHp,
+        ) -
+        target.currentHp;
+    target.currentHp += healed;
+    unit.hasActed = true;
+    unit.spendSignature(GameConfig.fieldHealSkillId);
+    aimMode = TacticalAimMode.none;
+    log.add(
+      CombatLogEntry(
+        '${unit.displayName} оказывает помощь ${target.displayName} (+$healed HP).',
+      ),
+    );
+
+    if (target.isPanicked) {
+      target.isPanicked = false;
+      target.hasMoved = false;
+      log.add(
+        CombatLogEntry(
+          '${unit.displayName} приводит ${target.displayName} в чувство.',
+        ),
+      );
+    }
     return true;
   }
 
@@ -352,6 +592,7 @@ class BattleController {
       turnNumber++;
       for (final u in units) {
         u.resetTurnFlags();
+        if (u.suppressedTurns > 0) u.suppressedTurns--;
       }
       _lockAutonomousAllies();
       _recomputeVisibility();
@@ -439,6 +680,7 @@ class BattleController {
       case 0:
         unit.hasMoved = true;
         unit.hasActed = true;
+        unit.isPanicked = true;
         log.add(
           CombatLogEntry(
             '${unit.displayName} теряет самообладание и упускает ход.',

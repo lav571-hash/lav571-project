@@ -260,13 +260,72 @@ void main() {
     );
     await _pumpFrames(tester);
 
-    expect(find.text('Взломать'), findsOneWidget);
+    expect(find.text('Взлом'), findsOneWidget);
     expect(find.text('Турель'), findsOneWidget);
 
-    await tester.tap(find.text('Взломать'));
+    await tester.tap(find.text('Взлом'));
     await _pumpFrames(tester);
 
     expect(find.textContaining('взламывает'), findsOneWidget);
     expect(find.text('МИССИЯ ВЫПОЛНЕНА'), findsOneWidget);
+  });
+
+  testWidgets('medic HUD heals the only wounded ally standing next to them', (
+    tester,
+  ) async {
+    final medic = TacticalUnit(
+      id: 'medic',
+      team: Team.player,
+      displayName: 'Vitals',
+      maxHp: 100,
+      position: const GridPos(2, 2),
+      movementRange: 5,
+      baseAccuracy: 65,
+      weapon: kWeaponCatalog['pistol_mk1']!,
+      skillIds: const [GameConfig.fieldHealSkillId],
+    );
+    final wounded = TacticalUnit(
+      id: 'wounded',
+      team: Team.player,
+      displayName: 'Rook',
+      maxHp: 100,
+      currentHp: 40,
+      position: const GridPos(3, 2),
+      movementRange: 5,
+      baseAccuracy: 65,
+      weapon: kWeaponCatalog['pistol_mk1']!,
+    );
+    final enemy = TacticalUnit(
+      id: 'e1',
+      team: Team.enemy,
+      displayName: 'Test Merc',
+      maxHp: 50,
+      position: const GridPos(6, 4),
+      movementRange: 4,
+      baseAccuracy: 10,
+      weapon: kWeaponCatalog['pistol_mk1']!,
+    );
+    final controller = BattleController(
+      map: TacticalMap(width: 8, height: 6),
+      units: [medic, wounded, enemy],
+    );
+    controller.selectUnit(medic.id);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: TacticalScreen(controller: controller, mission: _mission()),
+      ),
+    );
+    await _pumpFrames(tester);
+
+    expect(find.text('Лечение'), findsOneWidget);
+
+    await tester.tap(find.text('Лечение'));
+    await _pumpFrames(tester);
+
+    expect(wounded.currentHp, 40 + GameConfig.fieldHealAmount);
+    expect(find.textContaining('оказывает помощь'), findsOneWidget);
+    // The signature is spent, so the button is gone for the rest of the battle.
+    expect(find.text('Лечение'), findsNothing);
   });
 }

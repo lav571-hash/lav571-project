@@ -121,8 +121,16 @@ class BattlefieldComponent extends PositionComponent with TapCallbacks {
       );
     }
 
-    if (controller.aimMode == TacticalAimMode.hack) {
-      for (final t in controller.hackableTargetsForSelected()) {
+    final aimColor = switch (controller.aimMode) {
+      TacticalAimMode.hack => AppColors.neonMagenta,
+      TacticalAimMode.overrun => AppColors.titanDynamics,
+      TacticalAimMode.aimedShot => AppColors.neonCyan,
+      TacticalAimMode.suppress => AppColors.neonYellow,
+      TacticalAimMode.fieldHeal => AppColors.neonGreen,
+      _ => null,
+    };
+    if (aimColor != null) {
+      for (final t in controller.aimTargetsForSelected()) {
         final rect = Rect.fromLTWH(
           t.position.x * ts,
           t.position.y * ts,
@@ -132,7 +140,7 @@ class BattlefieldComponent extends PositionComponent with TapCallbacks {
         canvas.drawRect(
           rect.deflate(1),
           Paint()
-            ..color = AppColors.neonMagenta
+            ..color = aimColor
             ..style = PaintingStyle.stroke
             ..strokeWidth = 2.5,
         );

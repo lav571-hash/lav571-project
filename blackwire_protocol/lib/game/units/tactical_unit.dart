@@ -32,8 +32,15 @@ class TacticalUnit {
   bool hasMoved = false;
   bool hasActed = false;
   bool isHacked = false;
-  bool hasUsedHack = false;
-  bool hasDeployedTurret = false;
+
+  /// Signature skills already spent this battle. Each signature tactical
+  /// action (hack, turret, overrun, aimed shot, suppression, field heal)
+  /// may be used once per mission.
+  final Set<String> usedSignatures = {};
+
+  /// Remaining turns this unit shoots at a penalty and cannot advance,
+  /// applied by the heavy's suppression action.
+  int suppressedTurns = 0;
 
   /// Per-mission combat tallies, used after the battle to grow the
   /// underlying soldier's stats through practice (see
@@ -42,8 +49,8 @@ class TacticalUnit {
   int hits = 0;
   int kills = 0;
 
-  /// Set for one turn when this unit fails a Will check; consumed by
-  /// [BattleController] to apply the panic effect immediately.
+  /// Set for the turn a failed Will check costs this unit its turn. The
+  /// medic's field heal can rally a unit in this state.
   bool isPanicked = false;
 
   TacticalUnit({
@@ -69,13 +76,26 @@ class TacticalUnit {
 
   int get effectiveWeaponRange => weapon.range + weaponRangeBonus;
 
-  bool get canHack =>
-      !isTurret && skillIds.contains(GameConfig.hackSkillId) && !hasUsedHack;
+  bool get isSuppressed => suppressedTurns > 0;
 
-  bool get canDeployTurret =>
-      !isTurret &&
-      skillIds.contains(GameConfig.turretSkillId) &&
-      !hasDeployedTurret;
+  /// True when this unit knows [skillId] and has not spent it yet. Turrets
+  /// are autonomous and never carry signature skills.
+  bool hasSignatureAvailable(String skillId) =>
+      !isTurret && skillIds.contains(skillId) && !usedSignatures.contains(skillId);
+
+  void spendSignature(String skillId) => usedSignatures.add(skillId);
+
+  bool get canHack => hasSignatureAvailable(GameConfig.hackSkillId);
+  bool get canDeployTurret => hasSignatureAvailable(GameConfig.turretSkillId);
+  bool get canOverrun => hasSignatureAvailable(GameConfig.overrunSkillId);
+  bool get canAimedShot =>
+      hasSignatureAvailable(GameConfig.aimedShotSkillId) && !hasMoved;
+  bool get canSuppress => hasSignatureAvailable(GameConfig.suppressSkillId);
+  bool get canFieldHeal => hasSignatureAvailable(GameConfig.fieldHealSkillId);
+
+  bool get hasUsedHack => usedSignatures.contains(GameConfig.hackSkillId);
+  bool get hasDeployedTurret =>
+      usedSignatures.contains(GameConfig.turretSkillId);
 
   bool get isAlive => currentHp > 0;
 
@@ -84,6 +104,7 @@ class TacticalUnit {
   void resetTurnFlags() {
     hasMoved = false;
     hasActed = false;
+    isPanicked = false;
   }
 
   bool get canAct => isAlive && !(hasMoved && hasActed);
