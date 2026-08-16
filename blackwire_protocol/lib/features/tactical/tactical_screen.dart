@@ -294,15 +294,19 @@ class _TacticalScreenState extends State<TacticalScreen> {
                     color: AppColors.neonYellow,
                     selected:
                         controller.aimMode == TacticalAimMode.deployTurret,
-                    onTap: () {
-                      setState(() {
-                        if (deployTiles.length == 1) {
-                          controller.deployTurretAt(deployTiles.first);
-                        } else {
-                          controller.setAimMode(TacticalAimMode.deployTurret);
-                        }
-                      });
-                    },
+                    onTap: deployTiles.isEmpty
+                        ? null
+                        : () {
+                            setState(() {
+                              if (deployTiles.length == 1) {
+                                controller.deployTurretAt(deployTiles.first);
+                              } else {
+                                controller.setAimMode(
+                                  TacticalAimMode.deployTurret,
+                                );
+                              }
+                            });
+                          },
                   ),
               ],
               TextButton(
@@ -329,8 +333,10 @@ class _TacticalScreenState extends State<TacticalScreen> {
     TacticalAimMode.none => '',
   };
 
-  /// A signature action button. Hidden when the unit lacks the skill or has
-  /// already spent it, and fires immediately when only one target qualifies.
+  /// A signature action button. Hidden only when the unit lacks the skill or
+  /// has already spent it; with no valid target it stays visible but
+  /// disabled, so the player can see the ability is still in reserve. Fires
+  /// immediately when exactly one target qualifies.
   Widget _signatureChip({
     required String label,
     required Color color,
@@ -338,20 +344,22 @@ class _TacticalScreenState extends State<TacticalScreen> {
     required bool available,
     required List<TacticalUnit> targets,
   }) {
-    if (!available || targets.isEmpty) return const SizedBox.shrink();
+    if (!available) return const SizedBox.shrink();
     return _actionChip(
       label: label,
       color: color,
       selected: controller.aimMode == mode,
-      onTap: () {
-        setState(() {
-          if (targets.length == 1) {
-            controller.performSignature(mode, targets.first);
-          } else {
-            controller.setAimMode(mode);
-          }
-        });
-      },
+      onTap: targets.isEmpty
+          ? null
+          : () {
+              setState(() {
+                if (targets.length == 1) {
+                  controller.performSignature(mode, targets.first);
+                } else {
+                  controller.setAimMode(mode);
+                }
+              });
+            },
     );
   }
 
@@ -359,14 +367,18 @@ class _TacticalScreenState extends State<TacticalScreen> {
     required String label,
     required Color color,
     required bool selected,
-    required VoidCallback onTap,
+    required VoidCallback? onTap,
   }) {
+    final enabled = onTap != null;
     return OutlinedButton(
       onPressed: onTap,
       style: OutlinedButton.styleFrom(
         foregroundColor: selected ? Colors.black : color,
         backgroundColor: selected ? color : Colors.transparent,
-        side: BorderSide(color: color),
+        disabledForegroundColor: color.withValues(alpha: 0.4),
+        side: BorderSide(
+          color: enabled ? color : color.withValues(alpha: 0.35),
+        ),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         visualDensity: VisualDensity.compact,
       ),

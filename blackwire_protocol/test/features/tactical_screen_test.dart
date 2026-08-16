@@ -328,4 +328,63 @@ void main() {
     // The signature is spent, so the button is gone for the rest of the battle.
     expect(find.text('Лечение'), findsNothing);
   });
+
+  testWidgets('a signature with no valid target stays visible but disabled', (
+    tester,
+  ) async {
+    final medic = TacticalUnit(
+      id: 'medic',
+      team: Team.player,
+      displayName: 'Vitals',
+      maxHp: 100,
+      position: const GridPos(2, 2),
+      movementRange: 5,
+      baseAccuracy: 65,
+      weapon: kWeaponCatalog['pistol_mk1']!,
+      skillIds: const [GameConfig.fieldHealSkillId],
+    );
+    // The only ally is at full health, so there is nobody to patch up.
+    final healthy = TacticalUnit(
+      id: 'healthy',
+      team: Team.player,
+      displayName: 'Rook',
+      maxHp: 100,
+      position: const GridPos(3, 2),
+      movementRange: 5,
+      baseAccuracy: 65,
+      weapon: kWeaponCatalog['pistol_mk1']!,
+    );
+    final enemy = TacticalUnit(
+      id: 'e1',
+      team: Team.enemy,
+      displayName: 'Test Merc',
+      maxHp: 50,
+      position: const GridPos(6, 4),
+      movementRange: 4,
+      baseAccuracy: 10,
+      weapon: kWeaponCatalog['pistol_mk1']!,
+    );
+    final controller = BattleController(
+      map: TacticalMap(width: 8, height: 6),
+      units: [medic, healthy, enemy],
+    );
+    controller.selectUnit(medic.id);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: TacticalScreen(controller: controller, mission: _mission()),
+      ),
+    );
+    await _pumpFrames(tester);
+
+    expect(find.text('Лечение'), findsOneWidget);
+    final button = tester.widget<OutlinedButton>(
+      find.ancestor(
+        of: find.text('Лечение'),
+        matching: find.byType(OutlinedButton),
+      ),
+    );
+    expect(button.onPressed, isNull);
+    expect(medic.canFieldHeal, isTrue);
+  });
 }
