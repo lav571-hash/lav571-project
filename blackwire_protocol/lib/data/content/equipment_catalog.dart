@@ -38,6 +38,15 @@ const Map<String, WeaponDef> kWeaponCatalog = {
     range: 5,
     baseAccuracy: 78,
   ),
+  'turret_mk1': WeaponDef(
+    id: 'turret_mk1',
+    name: 'Автотурель Mk1',
+    tier: 1,
+    minDamage: 12,
+    maxDamage: 18,
+    range: 6,
+    baseAccuracy: 70,
+  ),
 };
 
 const Map<String, ArmorDef> kArmorCatalog = {

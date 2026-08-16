@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import 'package:blackwire_protocol/core/constants.dart';
 import 'package:blackwire_protocol/data/content/equipment_catalog.dart';
 import 'package:blackwire_protocol/data/models/faction.dart';
 import 'package:blackwire_protocol/data/models/mission_site.dart';
@@ -220,4 +221,52 @@ void main() {
       );
     },
   );
+
+  testWidgets('technician HUD hacks a Nexus droid and shows the combat log', (
+    tester,
+  ) async {
+    final tech = TacticalUnit(
+      id: 'tech',
+      team: Team.player,
+      displayName: 'Wire',
+      maxHp: 100,
+      position: const GridPos(2, 2),
+      movementRange: 5,
+      baseAccuracy: 65,
+      weapon: kWeaponCatalog['pistol_mk1']!,
+      skillIds: const [GameConfig.hackSkillId, GameConfig.turretSkillId],
+    );
+    final droid = TacticalUnit(
+      id: 'droid',
+      team: Team.enemy,
+      displayName: 'Боевой дроид #1',
+      maxHp: 50,
+      position: const GridPos(4, 2),
+      movementRange: 4,
+      baseAccuracy: 54,
+      weapon: kWeaponCatalog['pistol_mk1']!,
+      enemyFactionId: EnemyFactionId.nexusRobotics,
+    );
+    final controller = BattleController(
+      map: TacticalMap(width: 8, height: 6),
+      units: [tech, droid],
+    );
+    controller.selectUnit(tech.id);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: TacticalScreen(controller: controller, mission: _mission()),
+      ),
+    );
+    await _pumpFrames(tester);
+
+    expect(find.text('Взломать'), findsOneWidget);
+    expect(find.text('Турель'), findsOneWidget);
+
+    await tester.tap(find.text('Взломать'));
+    await _pumpFrames(tester);
+
+    expect(find.textContaining('взламывает'), findsOneWidget);
+    expect(find.text('МИССИЯ ВЫПОЛНЕНА'), findsOneWidget);
+  });
 }

@@ -55,6 +55,13 @@ class GameConfig {
   static const int enemyAccuracyPerDifficulty = 2;
   static const double enemyFearAttackChance = 0.18;
 
+  // --- Technician tactical actions ---------------------------------------
+  static const int hackRange = 6;
+  static const int turretHp = 28;
+  static const int turretAccuracy = 62;
+  static const String hackSkillId = 'tech_sig_hack';
+  static const String turretSkillId = 'tech_sig_drone';
+
   // --- Medbay ------------------------------------------------------------
   static const double medbayRecoveryBonusPerLevel = 0.25;
   static const int intensiveCareBaseCost = 50;

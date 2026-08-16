@@ -68,6 +68,7 @@ class BattleFactory {
           critChance: bonuses.critChance,
           willpower: soldier.willpower + bonuses.will,
           soldierId: soldier.id,
+          skillIds: List<String>.from(soldier.unlockedSkillIds),
         ),
       );
     }

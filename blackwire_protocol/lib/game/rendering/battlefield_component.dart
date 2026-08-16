@@ -120,6 +120,41 @@ class BattlefieldComponent extends PositionComponent with TapCallbacks {
           ..strokeWidth = 2.5,
       );
     }
+
+    if (controller.aimMode == TacticalAimMode.hack) {
+      for (final t in controller.hackableTargetsForSelected()) {
+        final rect = Rect.fromLTWH(
+          t.position.x * ts,
+          t.position.y * ts,
+          ts,
+          ts,
+        );
+        canvas.drawRect(
+          rect.deflate(1),
+          Paint()
+            ..color = AppColors.neonMagenta
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 2.5,
+        );
+      }
+    }
+
+    if (controller.aimMode == TacticalAimMode.deployTurret) {
+      for (final pos in controller.deployTilesForSelected()) {
+        final rect = Rect.fromLTWH(pos.x * ts, pos.y * ts, ts, ts);
+        canvas.drawRect(
+          rect.deflate(3),
+          Paint()..color = AppColors.neonYellow.withValues(alpha: 0.28),
+        );
+        canvas.drawRect(
+          rect.deflate(3),
+          Paint()
+            ..color = AppColors.neonYellow
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.5,
+        );
+      }
+    }
   }
 
   void _renderUnits(Canvas canvas) {
@@ -133,7 +168,12 @@ class BattlefieldComponent extends PositionComponent with TapCallbacks {
         unit.position.y * ts + ts / 2,
       );
       final color = unit.team == Team.player
-          ? AppColors.neonCyan
+          ? (unit.isTurret
+                ? AppColors.neonYellow
+                : (unit.isHacked
+                      ? (kFactionDefs[unit.enemyFactionId]?.color ??
+                            AppColors.neonGreen)
+                      : AppColors.neonCyan))
           : (kFactionDefs[unit.enemyFactionId]?.color ?? AppColors.danger);
       final radius = ts * 0.32;
 
@@ -148,14 +188,26 @@ class BattlefieldComponent extends PositionComponent with TapCallbacks {
         );
       }
 
-      canvas.drawCircle(center, radius, Paint()..color = color);
+      if (unit.isTurret) {
+        final rect = Rect.fromCenter(
+          center: center,
+          width: radius * 1.7,
+          height: radius * 1.7,
+        );
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(rect, const Radius.circular(3)),
+          Paint()..color = color,
+        );
+      } else {
+        canvas.drawCircle(center, radius, Paint()..color = color);
+      }
       canvas.drawCircle(
         center,
         radius,
         Paint()
-          ..color = const Color(0x99000000)
+          ..color = unit.isHacked ? AppColors.neonCyan : const Color(0x99000000)
           ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.5,
+          ..strokeWidth = unit.isHacked ? 2.5 : 1.5,
       );
 
       final barWidth = ts * 0.72;

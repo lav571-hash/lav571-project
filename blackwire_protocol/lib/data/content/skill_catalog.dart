@@ -9,10 +9,9 @@ import '../models/specialization.dart';
 /// content set small and hand-tunable while still giving every one of the
 /// 9 rank-up choices (Ranks 2-10) real mechanical weight.
 ///
-/// NOTE: Technician's flavor (hacking droids / deploying a turret-drone) is
-/// represented here as stat bonuses; a fully bespoke hack/deploy tactical
-/// mechanic is out of scope for this pass and tracked as a follow-up, same
-/// as the still-unused grenade/stim research abilities.
+/// Technician signatures also unlock battlefield actions (hack a Nexus
+/// droid / deploy a turret). Grenade and stim research abilities remain
+/// unused and are still a follow-up.
 class SkillCatalog {
   SkillCatalog._();
 
@@ -135,7 +134,7 @@ class SkillCatalog {
     Specialization.technician: SkillDef(
       id: 'tech_sig_hack',
       name: 'Протокол взлома',
-      description: '+4 к меткости против взломанных систем.',
+      description: '+4 к меткости. Раз за бой: взломать видимого боевого дроида Nexus — он переходит под контроль отряда.',
       specialization: Specialization.technician,
       effect: SkillEffect(SkillEffectType.accuracy, 4),
       repeatable: false,
@@ -178,7 +177,7 @@ class SkillCatalog {
     Specialization.technician: SkillDef(
       id: 'tech_sig_drone',
       name: 'Боевой дрон',
-      description: '+5 к урону оружия (огневая поддержка дрона).',
+      description: '+5 к урону оружия. Раз за бой: развернуть турель на соседней клетке; она стреляет в конце хода отряда.',
       specialization: Specialization.technician,
       effect: SkillEffect(SkillEffectType.weaponDamage, 5),
       repeatable: false,

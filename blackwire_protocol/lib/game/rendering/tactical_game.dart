@@ -52,6 +52,21 @@ class TacticalGame extends FlameGame {
 
     final selected = controller.selectedUnit;
 
+    if (selected != null &&
+        controller.aimMode == TacticalAimMode.deployTurret) {
+      controller.deployTurretAt(pos);
+      onStateChanged();
+      return;
+    }
+
+    if (selected != null &&
+        controller.aimMode == TacticalAimMode.hack &&
+        unitAtPos != null) {
+      controller.hackTarget(unitAtPos.id);
+      onStateChanged();
+      return;
+    }
+
     if (selected == null) {
       if (unitAtPos != null && unitAtPos.team == Team.player) {
         controller.selectUnit(unitAtPos.id);

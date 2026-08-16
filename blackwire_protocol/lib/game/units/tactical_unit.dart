@@ -10,7 +10,7 @@ enum Team { player, enemy }
 /// represents a disposable combatant belonging to an [EnemyFactionId].
 class TacticalUnit {
   final String id;
-  final Team team;
+  Team team;
   final String displayName;
   final int maxHp;
   int currentHp;
@@ -26,9 +26,14 @@ class TacticalUnit {
 
   final String? soldierId;
   final EnemyFactionId? enemyFactionId;
+  final List<String> skillIds;
+  final bool isTurret;
 
   bool hasMoved = false;
   bool hasActed = false;
+  bool isHacked = false;
+  bool hasUsedHack = false;
+  bool hasDeployedTurret = false;
 
   /// Per-mission combat tallies, used after the battle to grow the
   /// underlying soldier's stats through practice (see
@@ -57,10 +62,20 @@ class TacticalUnit {
     this.willpower = GameConfig.startingWillpower,
     this.soldierId,
     this.enemyFactionId,
+    this.skillIds = const [],
+    this.isTurret = false,
     int? currentHp,
   }) : currentHp = currentHp ?? maxHp;
 
   int get effectiveWeaponRange => weapon.range + weaponRangeBonus;
+
+  bool get canHack =>
+      !isTurret && skillIds.contains(GameConfig.hackSkillId) && !hasUsedHack;
+
+  bool get canDeployTurret =>
+      !isTurret &&
+      skillIds.contains(GameConfig.turretSkillId) &&
+      !hasDeployedTurret;
 
   bool get isAlive => currentHp > 0;
 

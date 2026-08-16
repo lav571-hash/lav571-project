@@ -197,7 +197,15 @@ class _TacticalScreenState extends State<TacticalScreen> {
                           : AppColors.neonYellow),
               ),
             ),
-            if (u.isAlive && !canAct)
+            if (u.isAlive && u.isTurret)
+              const Padding(
+                padding: EdgeInsets.only(top: 2),
+                child: Text(
+                  'автоогонь',
+                  style: TextStyle(fontSize: 9, color: AppColors.neonYellow),
+                ),
+              )
+            else if (u.isAlive && !canAct)
               const Padding(
                 padding: EdgeInsets.only(top: 2),
                 child: Text(
@@ -217,34 +225,95 @@ class _TacticalScreenState extends State<TacticalScreen> {
     final canAttack =
         !unit.hasActed && controller.phase == BattlePhase.playerTurn;
     final targets = controller.attackableTargetsForSelected();
+    final hackTargets = controller.hackableTargetsForSelected();
+    final deployTiles = controller.deployTilesForSelected();
     return Container(
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
         color: AppColors.surfaceAlt,
         borderRadius: BorderRadius.circular(8),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Text(
-              '${unit.displayName} · ${unit.weapon.name} · HP ${unit.currentHp}/${unit.maxHp}'
-              '${canMove ? ' · можно двигаться' : ''}'
-              '${canAttack ? (targets.isNotEmpty ? ' · есть цель в зоне поражения' : '') : ''}',
-              style: const TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 12,
-              ),
+          Text(
+            '${unit.displayName} · ${unit.weapon.name} · HP ${unit.currentHp}/${unit.maxHp}'
+            '${unit.isHacked ? ' · взломан' : ''}'
+            '${unit.isTurret ? ' · автоогонь' : ''}'
+            '${canMove ? ' · можно двигаться' : ''}'
+            '${canAttack ? (targets.isNotEmpty ? ' · есть цель в зоне поражения' : '') : ''}'
+            '${controller.aimMode == TacticalAimMode.hack ? ' · выберите дроида Nexus' : ''}'
+            '${controller.aimMode == TacticalAimMode.deployTurret ? ' · выберите клетку для турели' : ''}',
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 12,
             ),
           ),
-          TextButton(
-            onPressed: () => setState(() => controller.skipSelectedUnit()),
-            child: const Text(
-              'Пропустить',
-              style: TextStyle(color: AppColors.textSecondary),
-            ),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            children: [
+              if (unit.canHack && canAttack)
+                _actionChip(
+                  label: hackTargets.length == 1 ? 'Взломать' : 'Взлом',
+                  color: AppColors.neonMagenta,
+                  selected: controller.aimMode == TacticalAimMode.hack,
+                  onTap: () {
+                    setState(() {
+                      if (hackTargets.length == 1) {
+                        controller.hackTarget(hackTargets.first.id);
+                      } else {
+                        controller.setAimMode(TacticalAimMode.hack);
+                      }
+                    });
+                  },
+                ),
+              if (unit.canDeployTurret && canAttack)
+                _actionChip(
+                  label: 'Турель',
+                  color: AppColors.neonYellow,
+                  selected: controller.aimMode == TacticalAimMode.deployTurret,
+                  onTap: () {
+                    setState(() {
+                      if (deployTiles.length == 1) {
+                        controller.deployTurretAt(deployTiles.first);
+                      } else {
+                        controller.setAimMode(TacticalAimMode.deployTurret);
+                      }
+                    });
+                  },
+                ),
+              TextButton(
+                onPressed: () => setState(() => controller.skipSelectedUnit()),
+                child: const Text(
+                  'Пропустить',
+                  style: TextStyle(color: AppColors.textSecondary),
+                ),
+              ),
+            ],
           ),
         ],
       ),
+    );
+  }
+
+  Widget _actionChip({
+    required String label,
+    required Color color,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return OutlinedButton(
+      onPressed: onTap,
+      style: OutlinedButton.styleFrom(
+        foregroundColor: selected ? Colors.black : color,
+        backgroundColor: selected ? color : Colors.transparent,
+        side: BorderSide(color: color),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        visualDensity: VisualDensity.compact,
+      ),
+      child: Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
     );
   }
 

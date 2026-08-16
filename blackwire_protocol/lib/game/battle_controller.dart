@@ -1,6 +1,8 @@
 import 'dart:math';
 
 import '../core/constants.dart';
+import '../data/content/equipment_catalog.dart';
+import '../data/models/faction.dart';
 import 'ai/simple_ai.dart';
 import 'combat/combat_resolver.dart';
 import 'map/line_of_sight.dart';
@@ -10,6 +12,8 @@ import 'map/tile.dart';
 import 'units/tactical_unit.dart';
 
 enum BattlePhase { playerTurn, enemyTurn, victory, defeat }
+
+enum TacticalAimMode { none, hack, deployTurret }
 
 class CombatLogEntry {
   final String text;
@@ -27,6 +31,7 @@ class BattleController {
   final Random random;
 
   BattlePhase phase = BattlePhase.playerTurn;
+  TacticalAimMode aimMode = TacticalAimMode.none;
   String? selectedUnitId;
   final Set<GridPos> exploredTiles = {};
   final List<CombatLogEntry> log = [];
@@ -93,9 +98,22 @@ class BattleController {
     final unit = units.where((u) => u.id == id).firstOrNull;
     if (unit == null || unit.team != Team.player || !unit.isAlive) return;
     selectedUnitId = id;
+    aimMode = TacticalAimMode.none;
   }
 
-  void clearSelection() => selectedUnitId = null;
+  void clearSelection() {
+    selectedUnitId = null;
+    aimMode = TacticalAimMode.none;
+  }
+
+  void setAimMode(TacticalAimMode mode) {
+    if (phase != BattlePhase.playerTurn) return;
+    final unit = selectedUnit;
+    if (unit == null || unit.hasActed) return;
+    if (mode == TacticalAimMode.hack && !unit.canHack) return;
+    if (mode == TacticalAimMode.deployTurret && !unit.canDeployTurret) return;
+    aimMode = aimMode == mode ? TacticalAimMode.none : mode;
+  }
 
   Map<GridPos, List<GridPos>> movementOptionsForSelected() {
     final unit = selectedUnit;
@@ -171,6 +189,107 @@ class BattleController {
     clearSelection();
   }
 
+  List<TacticalUnit> hackableTargetsForSelected() {
+    final unit = selectedUnit;
+    if (unit == null ||
+        unit.hasActed ||
+        !unit.canHack ||
+        phase != BattlePhase.playerTurn) {
+      return [];
+    }
+    return aliveEnemyUnits.where((enemy) => _canHack(unit, enemy)).toList();
+  }
+
+  bool _canHack(TacticalUnit technician, TacticalUnit enemy) {
+    if (!enemy.isAlive || enemy.team != Team.enemy) return false;
+    if (enemy.enemyFactionId != EnemyFactionId.nexusRobotics) return false;
+    if (!isEnemyVisible(enemy)) return false;
+    if (technician.position.chebyshevDistanceTo(enemy.position) >
+        GameConfig.hackRange) {
+      return false;
+    }
+    return LineOfSight.hasLineOfSight(map, technician.position, enemy.position);
+  }
+
+  bool hackTarget(String targetId) {
+    final unit = selectedUnit;
+    if (unit == null || unit.hasActed || phase != BattlePhase.playerTurn) {
+      return false;
+    }
+    if (!unit.canHack) return false;
+    final target = units.where((u) => u.id == targetId).firstOrNull;
+    if (target == null || !_canHack(unit, target)) return false;
+
+    target.team = Team.player;
+    target.isHacked = true;
+    target.hasMoved = true;
+    target.hasActed = true;
+    unit.hasActed = true;
+    unit.hasUsedHack = true;
+    aimMode = TacticalAimMode.none;
+    log.add(
+      CombatLogEntry(
+        '${unit.displayName} взламывает ${target.displayName} — дроид переходит под контроль Reclaim.',
+      ),
+    );
+    _checkEndConditions();
+    return true;
+  }
+
+  Set<GridPos> deployTilesForSelected() {
+    final unit = selectedUnit;
+    if (unit == null ||
+        unit.hasActed ||
+        !unit.canDeployTurret ||
+        phase != BattlePhase.playerTurn) {
+      return {};
+    }
+    final occupied = units
+        .where((u) => u.isAlive)
+        .map((u) => u.position)
+        .toSet();
+    final tiles = <GridPos>{};
+    for (final pos in map.allPositions) {
+      if (unit.position.chebyshevDistanceTo(pos) != 1) continue;
+      if (!map.isWalkable(pos) || occupied.contains(pos)) continue;
+      tiles.add(pos);
+    }
+    return tiles;
+  }
+
+  bool deployTurretAt(GridPos pos) {
+    final unit = selectedUnit;
+    if (unit == null || unit.hasActed || phase != BattlePhase.playerTurn) {
+      return false;
+    }
+    if (!deployTilesForSelected().contains(pos)) return false;
+
+    final turret = TacticalUnit(
+      id: 'turret_${unit.id}_${units.length}',
+      team: Team.player,
+      displayName: 'Турель ${unit.displayName}',
+      maxHp: GameConfig.turretHp,
+      position: pos,
+      movementRange: 0,
+      baseAccuracy: GameConfig.turretAccuracy,
+      weapon: kWeaponCatalog['turret_mk1']!,
+      isTurret: true,
+    );
+    turret.hasMoved = true;
+    turret.hasActed = true;
+    units.add(turret);
+    unit.hasActed = true;
+    unit.hasDeployedTurret = true;
+    aimMode = TacticalAimMode.none;
+    log.add(
+      CombatLogEntry(
+        '${unit.displayName} разворачивает турель на ${pos.x},${pos.y}.',
+      ),
+    );
+    _recomputeVisibility();
+    return true;
+  }
+
   bool get allPlayerUnitsDone =>
       alivePlayerUnits.every((u) => u.hasMoved && u.hasActed);
 
@@ -189,6 +308,8 @@ class BattleController {
     _checkEndConditions();
     if (phase != BattlePhase.enemyTurn) return;
     log.add(const CombatLogEntry('--- Ход противника ---'));
+    _fireAutonomousAllies();
+    if (phase != BattlePhase.enemyTurn) return;
     for (final enemy in List<TacticalUnit>.from(aliveEnemyUnits)) {
       if (phase != BattlePhase.enemyTurn) break;
       if (!enemy.isAlive) continue;
@@ -232,10 +353,43 @@ class BattleController {
       for (final u in units) {
         u.resetTurnFlags();
       }
+      _lockAutonomousAllies();
       _recomputeVisibility();
       phase = BattlePhase.playerTurn;
       log.add(CombatLogEntry('--- Ход $turnNumber: отряд Reclaim ---'));
       _resolvePendingPanics();
+    }
+  }
+
+  void _fireAutonomousAllies() {
+    for (final turret in List<TacticalUnit>.from(
+      alivePlayerUnits.where((u) => u.isTurret),
+    )) {
+      if (phase != BattlePhase.enemyTurn) return;
+      if (!turret.isAlive) continue;
+      final targets = aliveEnemyUnits
+          .where((e) => combatResolver.canAttack(map, turret, e))
+          .toList();
+      if (targets.isEmpty) continue;
+      targets.sort((a, b) => a.currentHp.compareTo(b.currentHp));
+      final target = targets.first;
+      final result = combatResolver.resolveAttack(map, turret, target);
+      log.add(
+        CombatLogEntry(
+          result.hit
+              ? '${turret.displayName} поражает ${target.displayName} (${result.damage} урона)${result.targetKilled ? ' — уничтожен!' : ''}'
+              : '${turret.displayName} промахивается по ${target.displayName}.',
+        ),
+      );
+      _checkEndConditions();
+    }
+  }
+
+  void _lockAutonomousAllies() {
+    for (final unit in alivePlayerUnits) {
+      if (!unit.isTurret) continue;
+      unit.hasMoved = true;
+      unit.hasActed = true;
     }
   }
 
@@ -244,6 +398,7 @@ class BattleController {
   // ---------------------------------------------------------------------
 
   void _checkPanicForAlliesOf(TacticalUnit deadUnit) {
+    if (deadUnit.isTurret) return;
     for (final ally in alivePlayerUnits) {
       if (ally.id == deadUnit.id) continue;
       if (LineOfSight.hasLineOfSight(map, ally.position, deadUnit.position)) {
@@ -253,7 +408,7 @@ class BattleController {
   }
 
   void _rollPanicCheck(TacticalUnit unit, String reason) {
-    if (!unit.isAlive || unit.team != Team.player) return;
+    if (!unit.isAlive || unit.team != Team.player || unit.isTurret) return;
     if (_pendingPanicResolutions.contains(unit)) return;
     final panicChance = (GameConfig.basePanicChance - unit.willpower).clamp(
       GameConfig.minPanicChance,
@@ -369,7 +524,11 @@ class BattleController {
   void _checkEndConditions() {
     if (aliveEnemyUnits.isEmpty) {
       phase = BattlePhase.victory;
-      log.add(const CombatLogEntry('Миссия выполнена. Все враги уничтожены.'));
+      log.add(
+        const CombatLogEntry(
+          'Миссия выполнена. Все враги уничтожены или взломаны.',
+        ),
+      );
     } else if (alivePlayerUnits.isEmpty) {
       phase = BattlePhase.defeat;
       log.add(const CombatLogEntry('Отряд уничтожен. Миссия провалена.'));
