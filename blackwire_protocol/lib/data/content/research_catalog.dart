@@ -1,0 +1,66 @@
+import '../models/research.dart';
+
+/// The research tree for the MVP: unlocks weapons, armor and abilities.
+const List<ResearchNodeDef> kResearchTree = [
+  ResearchNodeDef(
+    id: 'res_rifle_mk1',
+    name: 'Штурмовая винтовка Mk1',
+    description: 'Базовая штурмовая винтовка для отряда Reclaim.',
+    dataCost: 20,
+    unlockType: ResearchUnlockType.weapon,
+    unlockId: 'rifle_mk1',
+  ),
+  ResearchNodeDef(
+    id: 'res_vest_light',
+    name: 'Лёгкая броня',
+    description: 'Базовый бронежилет, снижает получаемый урон.',
+    dataCost: 25,
+    unlockType: ResearchUnlockType.armor,
+    unlockId: 'vest_light',
+  ),
+  ResearchNodeDef(
+    id: 'res_frag_grenade',
+    name: 'Осколочные гранаты',
+    description: 'Позволяет бойцам использовать гранаты в бою.',
+    dataCost: 35,
+    prerequisites: ['res_rifle_mk1'],
+    unlockType: ResearchUnlockType.ability,
+    unlockId: 'frag_grenade',
+  ),
+  ResearchNodeDef(
+    id: 'res_smg_arc',
+    name: 'ЭМ-пистолет-пулемёт «Дуга»',
+    description: 'Скорострельное оружие против дроидов Nexus Robotics.',
+    dataCost: 40,
+    prerequisites: ['res_rifle_mk1'],
+    unlockType: ResearchUnlockType.weapon,
+    unlockId: 'smg_arc',
+  ),
+  ResearchNodeDef(
+    id: 'res_exo_plate',
+    name: 'Экзо-пластины «Барьер»',
+    description: 'Продвинутая броня со значительным снижением урона.',
+    dataCost: 50,
+    prerequisites: ['res_vest_light'],
+    unlockType: ResearchUnlockType.armor,
+    unlockId: 'exo_plate',
+  ),
+  ResearchNodeDef(
+    id: 'res_combat_stim',
+    name: 'Боевые стимуляторы',
+    description: 'Импланты, временно повышающие подвижность и меткость.',
+    dataCost: 45,
+    prerequisites: ['res_vest_light'],
+    unlockType: ResearchUnlockType.ability,
+    unlockId: 'combat_stim',
+  ),
+  ResearchNodeDef(
+    id: 'res_rifle_mk2',
+    name: 'Штурмовая винтовка Mk2',
+    description: 'Улучшенная винтовка с большим уроном и дальностью.',
+    dataCost: 60,
+    prerequisites: ['res_smg_arc', 'res_exo_plate'],
+    unlockType: ResearchUnlockType.weapon,
+    unlockId: 'rifle_mk2',
+  ),
+];
