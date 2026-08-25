@@ -226,6 +226,7 @@ class _TacticalScreenState extends State<TacticalScreen> {
         !unit.hasActed && controller.phase == BattlePhase.playerTurn;
     final targets = controller.attackableTargetsForSelected();
     final deployTiles = controller.deployTilesForSelected();
+    final grenadeTiles = controller.grenadeTilesForSelected();
     return Container(
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
@@ -239,6 +240,8 @@ class _TacticalScreenState extends State<TacticalScreen> {
             '${unit.displayName} · ${unit.weapon.name} · HP ${unit.currentHp}/${unit.maxHp}'
             '${unit.isHacked ? ' · взломан' : ''}'
             '${unit.isTurret ? ' · автоогонь' : ''}'
+            '${unit.isStimmed ? ' · стимулятор активен' : ''}'
+            '${unit.isSuppressed ? ' · подавлен' : ''}'
             '${canMove ? ' · можно двигаться' : ''}'
             '${canAttack ? (targets.isNotEmpty ? ' · есть цель в зоне поражения' : '') : ''}'
             '${_aimHint(controller.aimMode)}',
@@ -308,6 +311,25 @@ class _TacticalScreenState extends State<TacticalScreen> {
                             });
                           },
                   ),
+                if (unit.canThrowGrenade)
+                  _actionChip(
+                    label: 'Граната',
+                    color: AppColors.danger,
+                    selected: controller.aimMode == TacticalAimMode.grenade,
+                    onTap: grenadeTiles.isEmpty
+                        ? null
+                        : () => setState(
+                            () => controller.setAimMode(TacticalAimMode.grenade),
+                          ),
+                  ),
+                if (unit.canUseStim)
+                  _actionChip(
+                    label: 'Стимулятор',
+                    color: AppColors.neonGreen,
+                    selected: false,
+                    onTap: () =>
+                        setState(() => controller.useStimOnSelected()),
+                  ),
               ],
               TextButton(
                 onPressed: () => setState(() => controller.skipSelectedUnit()),
@@ -329,6 +351,7 @@ class _TacticalScreenState extends State<TacticalScreen> {
     TacticalAimMode.overrun => ' · выберите цель в упор',
     TacticalAimMode.aimedShot => ' · выберите цель для выстрела',
     TacticalAimMode.suppress => ' · выберите цель для подавления',
+    TacticalAimMode.grenade => ' · выберите клетку для броска',
     TacticalAimMode.fieldHeal => ' · выберите раненого союзника рядом',
     TacticalAimMode.none => '',
   };

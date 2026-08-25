@@ -78,6 +78,22 @@ class GameConfig {
 
   static const int fieldHealAmount = 25;
 
+  // --- Researched consumables --------------------------------------------
+  /// Every soldier carries one of each researched consumable per mission.
+  static const String fragGrenadeId = 'frag_grenade';
+  static const String combatStimId = 'combat_stim';
+
+  static const int grenadeThrowRange = 5;
+  static const int grenadeBlastRadius = 1;
+  static const int grenadeMinDamage = 18;
+  static const int grenadeMaxDamage = 26;
+
+  static const int stimMovementBonus = 2;
+  static const int stimAccuracyBonus = 15;
+
+  /// The turn the stim is used plus the following one.
+  static const int stimTurns = 2;
+
   // --- Medbay ------------------------------------------------------------
   static const double medbayRecoveryBonusPerLevel = 0.25;
   static const int intensiveCareBaseCost = 50;

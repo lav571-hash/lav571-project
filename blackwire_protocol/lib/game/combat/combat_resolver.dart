@@ -85,7 +85,7 @@ class CombatResolver {
         : coverLevelFor(map, target.position, shooter.position);
     final chance =
         shooter.weapon.baseAccuracy +
-        (shooter.baseAccuracy - 65) -
+        (shooter.effectiveAccuracy - 65) -
         distancePenalty -
         coverPenalty(cover);
     return chance.clamp(5, 95);

@@ -329,6 +329,60 @@ void main() {
     expect(find.text('Лечение'), findsNothing);
   });
 
+  testWidgets('researched consumables appear in the HUD and can be used', (
+    tester,
+  ) async {
+    final soldier = TacticalUnit(
+      id: 'p1',
+      team: Team.player,
+      displayName: 'Reclaim-1',
+      maxHp: 100,
+      position: const GridPos(1, 2),
+      movementRange: 5,
+      baseAccuracy: 65,
+      weapon: kWeaponCatalog['pistol_mk1']!,
+      consumableIds: const [
+        GameConfig.fragGrenadeId,
+        GameConfig.combatStimId,
+      ],
+    );
+    final enemy = TacticalUnit(
+      id: 'e1',
+      team: Team.enemy,
+      displayName: 'Test Merc',
+      maxHp: 50,
+      position: const GridPos(4, 2),
+      movementRange: 4,
+      baseAccuracy: 10,
+      weapon: kWeaponCatalog['pistol_mk1']!,
+    );
+    final controller = BattleController(
+      map: TacticalMap(width: 8, height: 6),
+      units: [soldier, enemy],
+    );
+    controller.selectUnit(soldier.id);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: TacticalScreen(controller: controller, mission: _mission()),
+      ),
+    );
+    await _pumpFrames(tester);
+
+    expect(find.text('Граната'), findsOneWidget);
+    expect(find.text('Стимулятор'), findsOneWidget);
+
+    await tester.tap(find.text('Стимулятор'));
+    await _pumpFrames(tester);
+
+    expect(soldier.isStimmed, isTrue);
+    expect(find.textContaining('вкалывает боевой стимулятор'), findsOneWidget);
+    expect(find.textContaining('стимулятор активен'), findsOneWidget);
+    // Both the stim charge and this turn's action are spent.
+    expect(find.text('Стимулятор'), findsNothing);
+    expect(find.text('Граната'), findsNothing);
+  });
+
   testWidgets('a signature with no valid target stays visible but disabled', (
     tester,
   ) async {

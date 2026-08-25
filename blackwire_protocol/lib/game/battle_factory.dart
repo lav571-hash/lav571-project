@@ -21,6 +21,7 @@ class BattleFactory {
     required EnemyFactionId factionId,
     required int difficulty,
     Random? random,
+    Set<String> unlockedAbilityIds = const {},
   }) {
     final rng = random ?? Random();
     final generator = MapGenerator(random: rng);
@@ -69,6 +70,7 @@ class BattleFactory {
           willpower: soldier.willpower + bonuses.will,
           soldierId: soldier.id,
           skillIds: List<String>.from(soldier.unlockedSkillIds),
+          consumableIds: unlockedAbilityIds.toList(),
         ),
       );
     }

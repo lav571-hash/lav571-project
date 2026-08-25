@@ -27,6 +27,10 @@ class TacticalUnit {
   final String? soldierId;
   final EnemyFactionId? enemyFactionId;
   final List<String> skillIds;
+
+  /// Researched consumables this unit carries into the mission, one use of
+  /// each per battle (see [usedSignatures]).
+  final List<String> consumableIds;
   final bool isTurret;
 
   bool hasMoved = false;
@@ -41,6 +45,9 @@ class TacticalUnit {
   /// Remaining turns this unit shoots at a penalty and cannot advance,
   /// applied by the heavy's suppression action.
   int suppressedTurns = 0;
+
+  /// Remaining turns of the combat stim's movement/accuracy boost.
+  int stimTurnsLeft = 0;
 
   /// Per-mission combat tallies, used after the battle to grow the
   /// underlying soldier's stats through practice (see
@@ -70,6 +77,7 @@ class TacticalUnit {
     this.soldierId,
     this.enemyFactionId,
     this.skillIds = const [],
+    this.consumableIds = const [],
     this.isTurret = false,
     int? currentHp,
   }) : currentHp = currentHp ?? maxHp;
@@ -78,12 +86,30 @@ class TacticalUnit {
 
   bool get isSuppressed => suppressedTurns > 0;
 
+  bool get isStimmed => stimTurnsLeft > 0;
+
+  int get effectiveMovementRange =>
+      movementRange + (isStimmed ? GameConfig.stimMovementBonus : 0);
+
+  int get effectiveAccuracy =>
+      baseAccuracy + (isStimmed ? GameConfig.stimAccuracyBonus : 0);
+
   /// True when this unit knows [skillId] and has not spent it yet. Turrets
   /// are autonomous and never carry signature skills.
   bool hasSignatureAvailable(String skillId) =>
       !isTurret && skillIds.contains(skillId) && !usedSignatures.contains(skillId);
 
   void spendSignature(String skillId) => usedSignatures.add(skillId);
+
+  /// True when this unit still carries an unused charge of [abilityId].
+  bool hasConsumable(String abilityId) =>
+      !isTurret &&
+      consumableIds.contains(abilityId) &&
+      !usedSignatures.contains(abilityId);
+
+  bool get canThrowGrenade => hasConsumable(GameConfig.fragGrenadeId);
+  bool get canUseStim =>
+      hasConsumable(GameConfig.combatStimId) && !isStimmed;
 
   bool get canHack => hasSignatureAvailable(GameConfig.hackSkillId);
   bool get canDeployTurret => hasSignatureAvailable(GameConfig.turretSkillId);

@@ -688,6 +688,7 @@ class GameStateNotifier extends Notifier<GameSave> {
       factionId: mission.factionId,
       difficulty: mission.difficulty,
       random: _random,
+      unlockedAbilityIds: state.unlockedAbilityIds,
     );
   }
 

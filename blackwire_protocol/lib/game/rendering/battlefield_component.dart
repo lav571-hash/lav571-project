@@ -163,6 +163,16 @@ class BattlefieldComponent extends PositionComponent with TapCallbacks {
         );
       }
     }
+
+    if (controller.aimMode == TacticalAimMode.grenade) {
+      for (final pos in controller.grenadeTilesForSelected()) {
+        final rect = Rect.fromLTWH(pos.x * ts, pos.y * ts, ts, ts);
+        canvas.drawRect(
+          rect.deflate(4),
+          Paint()..color = AppColors.danger.withValues(alpha: 0.22),
+        );
+      }
+    }
   }
 
   void _renderUnits(Canvas canvas) {

@@ -21,6 +21,7 @@ enum TacticalAimMode {
   aimedShot,
   suppress,
   fieldHeal,
+  grenade,
 }
 
 class CombatLogEntry {
@@ -126,6 +127,7 @@ class BattleController {
       TacticalAimMode.aimedShot => unit.canAimedShot,
       TacticalAimMode.suppress => unit.canSuppress,
       TacticalAimMode.fieldHeal => unit.canFieldHeal,
+      TacticalAimMode.grenade => unit.canThrowGrenade,
     };
     if (!available) return;
     aimMode = aimMode == mode ? TacticalAimMode.none : mode;
@@ -169,7 +171,7 @@ class BattleController {
     return Pathfinding.reachableTiles(
       map,
       unit.position,
-      unit.movementRange,
+      unit.effectiveMovementRange,
       blocked: blocked,
     );
   }
@@ -530,6 +532,113 @@ class BattleController {
     return true;
   }
 
+  // ---------------------------------------------------------------------
+  // Researched consumables: frag grenade / combat stim
+  // ---------------------------------------------------------------------
+
+  /// Tiles the selected unit can lob a grenade onto: explored, in throwing
+  /// range and with a clear line of sight.
+  Set<GridPos> grenadeTilesForSelected() {
+    final unit = selectedUnit;
+    if (unit == null ||
+        unit.hasActed ||
+        !unit.canThrowGrenade ||
+        phase != BattlePhase.playerTurn) {
+      return {};
+    }
+    return map.allPositions
+        .where(
+          (pos) =>
+              pos != unit.position &&
+              map.tileAt(pos) != TileType.wall &&
+              isTileExplored(pos) &&
+              unit.position.chebyshevDistanceTo(pos) <=
+                  GameConfig.grenadeThrowRange &&
+              LineOfSight.hasLineOfSight(map, unit.position, pos),
+        )
+        .toSet();
+  }
+
+  /// Everything caught in the blast of a grenade landing on [center]: the
+  /// thrower is safe, but squadmates in the radius are not.
+  List<TacticalUnit> unitsInBlast(TacticalUnit thrower, GridPos center) => units
+      .where(
+        (u) =>
+            u.isAlive &&
+            u.id != thrower.id &&
+            u.position.chebyshevDistanceTo(center) <=
+                GameConfig.grenadeBlastRadius,
+      )
+      .toList();
+
+  /// Throws the selected unit's grenade at [center]. Damage ignores cover
+  /// and hits friend and foe alike, so blast placement matters.
+  bool throwGrenadeAt(GridPos center) {
+    final unit = selectedUnit;
+    if (unit == null || unit.hasActed || phase != BattlePhase.playerTurn) {
+      return false;
+    }
+    if (!grenadeTilesForSelected().contains(center)) return false;
+
+    final damage =
+        GameConfig.grenadeMinDamage +
+        random.nextInt(
+          GameConfig.grenadeMaxDamage - GameConfig.grenadeMinDamage + 1,
+        );
+    unit.hasActed = true;
+    unit.shotsFired++;
+    unit.spendSignature(GameConfig.fragGrenadeId);
+    aimMode = TacticalAimMode.none;
+    log.add(
+      CombatLogEntry(
+        '${unit.displayName} бросает гранату на ${center.x},${center.y}.',
+      ),
+    );
+
+    for (final caught in unitsInBlast(unit, center)) {
+      caught.applyDamage(damage);
+      if (caught.team == Team.enemy) unit.hits++;
+      final killed = !caught.isAlive;
+      if (killed && caught.team == Team.enemy) unit.kills++;
+      log.add(
+        CombatLogEntry(
+          'Взрыв накрывает ${caught.displayName} ($damage урона)'
+          '${killed ? ' — уничтожен!' : ''}',
+        ),
+      );
+      if (killed && caught.team == Team.player) {
+        _checkPanicForAlliesOf(caught);
+      }
+    }
+
+    _recomputeVisibility();
+    _checkEndConditions();
+    return true;
+  }
+
+  /// Injects the selected unit's combat stim: costs the action, but grants
+  /// extra movement and accuracy for this turn and the next.
+  bool useStimOnSelected() {
+    final unit = selectedUnit;
+    if (unit == null || unit.hasActed || phase != BattlePhase.playerTurn) {
+      return false;
+    }
+    if (!unit.canUseStim) return false;
+
+    unit.stimTurnsLeft = GameConfig.stimTurns;
+    unit.hasActed = true;
+    unit.spendSignature(GameConfig.combatStimId);
+    aimMode = TacticalAimMode.none;
+    log.add(
+      CombatLogEntry(
+        '${unit.displayName} вкалывает боевой стимулятор '
+        '(+${GameConfig.stimMovementBonus} к движению, '
+        '+${GameConfig.stimAccuracyBonus} к меткости).',
+      ),
+    );
+    return true;
+  }
+
   bool get allPlayerUnitsDone =>
       alivePlayerUnits.every((u) => u.hasMoved && u.hasActed);
 
@@ -593,6 +702,7 @@ class BattleController {
       for (final u in units) {
         u.resetTurnFlags();
         if (u.suppressedTurns > 0) u.suppressedTurns--;
+        if (u.stimTurnsLeft > 0) u.stimTurnsLeft--;
       }
       _lockAutonomousAllies();
       _recomputeVisibility();
@@ -723,7 +833,7 @@ class BattleController {
         final reachable = Pathfinding.reachableTiles(
           map,
           unit.position,
-          unit.movementRange,
+          unit.effectiveMovementRange,
           blocked: blocked,
         );
         GridPos? bestTile;

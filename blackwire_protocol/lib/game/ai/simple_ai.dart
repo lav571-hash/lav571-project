@@ -197,7 +197,7 @@ class SimpleAi {
     return Pathfinding.reachableTiles(
       map,
       enemy.position,
-      enemy.movementRange,
+      enemy.effectiveMovementRange,
       blocked: blocked,
     );
   }

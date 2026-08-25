@@ -59,6 +59,12 @@ class TacticalGame extends FlameGame {
       return;
     }
 
+    if (selected != null && controller.aimMode == TacticalAimMode.grenade) {
+      controller.throwGrenadeAt(pos);
+      onStateChanged();
+      return;
+    }
+
     if (selected != null &&
         controller.aimMode != TacticalAimMode.none &&
         unitAtPos != null) {
